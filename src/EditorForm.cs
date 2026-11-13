@@ -105,6 +105,7 @@ namespace SnapStudio
             compact = compactMode;
             filePath = path;
             dpi = Dpi.Scale;
+            LoadLastStyle();
             Icon = AppIcon.FormIcon;
             KeyPreview = true;
             AutoScaleMode = AutoScaleMode.None;
@@ -116,7 +117,7 @@ namespace SnapStudio
             Theme.Changed += ApplyTheme;
             ApplyTheme();
             SetTool(Tool.Arrow);
-            SetColor(curColor);
+            SetColor(curColor, false);
             UpdateTitle();
             UpdateStatus();
             UpdateUndoButtons();
@@ -1233,9 +1234,35 @@ namespace SnapStudio
             if (btnMoreColor != null) btnMoreColor.Checked = !any;
         }
 
-        void SetColor(Color c)
+        /// <summary>O editor abre com a última cor, espessura e tamanho de texto que o utilizador escolheu.</summary>
+        void LoadLastStyle()
+        {
+            var st = TrayApp.Instance != null ? TrayApp.Instance.Settings : null;
+            if (st == null) return;
+            if (st.EditorColor != 0) curColor = Color.FromArgb(st.EditorColor);
+            if (st.EditorWidth >= 1 && st.EditorWidth <= 16) curWidth = st.EditorWidth;
+            if (st.EditorFont >= 12 && st.EditorFont <= 80) curFont = st.EditorFont;
+        }
+
+        /// <summary>Memoriza a escolha (gravada no disco ao fechar o editor).</summary>
+        void RememberStyle()
+        {
+            var st = TrayApp.Instance != null && !TrayApp.Instance.Headless ? TrayApp.Instance.Settings : null;
+            if (st == null) return;
+            int c = curColor.ToArgb(), w = (int)curWidth, f = (int)curFont;
+            if (st.EditorColor == c && st.EditorWidth == w && st.EditorFont == f) return;
+            st.EditorColor = c; st.EditorWidth = w; st.EditorFont = f;
+            styleChanged = true;
+        }
+
+        bool styleChanged;
+
+        void SetColor(Color c) { SetColor(c, true); }
+
+        void SetColor(Color c, bool remember)
         {
             curColor = c;
+            if (remember) RememberStyle();
             UpdateSwatches();
             if (textBox != null) { textColor = c; textBox.ForeColor = c; return; }
             if (selected != null && anns.Contains(selected) && selected.Argb != c.ToArgb())
@@ -1261,6 +1288,7 @@ namespace SnapStudio
         void SetWidth(float w)
         {
             curWidth = w;
+            RememberStyle();
             if (lblWidthVal != null) lblWidthVal.Text = (int)w + " px";
             if (selected != null && anns.Contains(selected) && selected.UsesWidth && selected.Width != w)
             {
@@ -1274,6 +1302,7 @@ namespace SnapStudio
         void SetFontSize(float s)
         {
             curFont = s;
+            RememberStyle();
             if (lblFontVal != null) lblFontVal.Text = (int)s + " px";
             if (textBox != null)
             {
@@ -1521,6 +1550,7 @@ namespace SnapStudio
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             Theme.Changed -= ApplyTheme;
+            if (styleChanged) try { TrayApp.Instance.Settings.Save(); } catch { }
             if (cache != null) cache.Dispose();
             tips.Dispose();
             base.OnFormClosed(e);

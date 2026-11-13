@@ -27,6 +27,9 @@ namespace SnapStudio
         [DataMember] public int HotkeyRecord;         // iniciar/parar gravação de vídeo
         [DataMember] public int VideoFps;
         [DataMember] public bool VideoCursor;
+        [DataMember] public int EditorColor;          // última cor escolhida no editor (ARGB; 0 = omissão)
+        [DataMember] public int EditorWidth;          // última espessura (px; 0 = omissão)
+        [DataMember] public int EditorFont;           // último tamanho do texto (px; 0 = omissão)
 
         public bool IsNew;
 
