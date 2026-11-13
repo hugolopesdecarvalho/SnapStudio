@@ -66,6 +66,58 @@ namespace SnapStudio
                 }
             }
 
+            // teste: --record segundos saída.mp4 [x y largura altura]
+            if (args.Length >= 3 && args[0] == "--record")
+            {
+                try
+                {
+                    Rectangle area = args.Length >= 7
+                        ? new Rectangle(int.Parse(args[3]), int.Parse(args[4]), int.Parse(args[5]), int.Parse(args[6]))
+                        : Screen.PrimaryScreen.Bounds;
+                    var rec = new VideoRecorder(args[2], area, 30, true);
+                    rec.Start();
+                    Thread.Sleep((int)(double.Parse(args[1], System.Globalization.CultureInfo.InvariantCulture) * 1000));
+                    var recorded = rec.Elapsed;
+                    rec.Stop();
+                    rec.Wait(30000);
+                    if (rec.Error != null) throw rec.Error;
+                    System.IO.File.WriteAllText(args[2] + ".txt", "frames=" + rec.FramesWritten + " size=" + rec.OutputSize + " secs=" + recorded.TotalSeconds.ToString("0.00") + " fps=" + (rec.FramesWritten / Math.Max(0.01, recorded.TotalSeconds)).ToString("0.0") + " grab=" + (rec.GrabMs / Math.Max(1, rec.FramesWritten)).ToString("0.0") + "ms");
+                    return 0;
+                }
+                catch (Exception ex) { System.IO.File.WriteAllText(args[2] + ".error.txt", ex.ToString()); return 1; }
+            }
+
+            // teste da gravação com barra e moldura: --record-ui segundos saída.mp4 x y largura altura
+            if (args.Length >= 7 && args[0] == "--record-ui")
+            {
+                string outPath = args[2];
+                try
+                {
+                    new TrayApp(System.IO.Path.GetDirectoryName(outPath), "dark");
+                    var area = new Rectangle(int.Parse(args[3]), int.Parse(args[4]), int.Parse(args[5]), int.Parse(args[6]));
+                    var r = new ScreenRecording(area, outPath, 30, true);
+                    string log = "";
+                    r.Ended += x => { log += "ended error=" + (x.Recorder.Error == null ? "none" : x.Recorder.Error.ToString()) + " frames=" + x.Recorder.FramesWritten + " duration=" + x.Duration; Application.ExitThread(); };
+                    r.Begin();
+                    var stopAt = new System.Windows.Forms.Timer { Interval = (int)(double.Parse(args[1], System.Globalization.CultureInfo.InvariantCulture) * 1000) };
+                    stopAt.Tick += delegate
+                    {
+                        stopAt.Stop();
+                        // imagem da barra a meio da gravação (DrawToBitmap ignora a exclusão da captura)
+                        foreach (Form f in Application.OpenForms)
+                            if (f is RecordingBar)
+                                using (var b = new Bitmap(f.Width, f.Height)) { f.DrawToBitmap(b, new Rectangle(0, 0, f.Width, f.Height)); b.Save(outPath + ".bar.png"); }
+                        r.TogglePause(); r.TogglePause();
+                        r.Stop();
+                    };
+                    stopAt.Start();
+                    Application.Run();
+                    System.IO.File.WriteAllText(outPath + ".txt", log);
+                    return 0;
+                }
+                catch (Exception ex) { System.IO.File.WriteAllText(outPath + ".error.txt", ex.ToString()); return 1; }
+            }
+
             if (args.Length >= 3 && args[0] == "--render")
             {
                 try { using (var f = new EditorForm(args[1], null)) f.ExportTo(args[2]); return 0; }

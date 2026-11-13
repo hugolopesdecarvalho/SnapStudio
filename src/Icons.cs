@@ -310,6 +310,19 @@ namespace SnapStudio
                     g.DrawLine(p, 10, 11, 10, 7); g.DrawLine(p, 10, 11, 13, 13);
                     g.DrawLine(p, 8, 2, 12, 2);
                     break;
+                case "record":
+                    g.DrawEllipse(p, 2.5f, 2.5f, 15, 15);
+                    using (var rb = new SolidBrush(Color.FromArgb(232, 64, 64))) g.FillEllipse(rb, 6, 6, 8, 8);
+                    break;
+                case "stop":
+                    using (var path = new GraphicsPath()) { path.AddRectangle(new RectangleF(5, 5, 10, 10)); g.FillPath(b, path); }
+                    break;
+                case "pause":
+                    g.FillRectangle(b, 5, 4, 3.4f, 12); g.FillRectangle(b, 11.6f, 4, 3.4f, 12);
+                    break;
+                case "play":
+                    g.FillPolygon(b, new[] { new PointF(6, 4), new PointF(6, 16), new PointF(16, 10) });
+                    break;
                 case "folder":
                     g.DrawLines(p, new[] { new PointF(2.5f, 16), new PointF(2.5f, 4), new PointF(8, 4), new PointF(10, 6.5f), new PointF(17.5f, 6.5f), new PointF(17.5f, 16), new PointF(2.5f, 16) });
                     break;

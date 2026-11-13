@@ -43,11 +43,12 @@ namespace SnapStudio
 
         readonly Dictionary<string, Panel> pages = new Dictionary<string, Panel>();
         readonly List<FlatButton> navButtons = new List<FlatButton>();
-        readonly ToggleRow tStartup, tPrtScn, tClipboard, tNotify;
+        readonly ToggleRow tStartup, tPrtScn, tClipboard, tNotify, tCursor;
         readonly List<ThemeCard> themeCards = new List<ThemeCard>();
         readonly List<FlatButton> accentButtons = new List<FlatButton>();
         readonly List<OptionRow> afterRows = new List<OptionRow>();
-        readonly HotkeyBox hkRegion, hkWindow, hkFull;
+        readonly HotkeyBox hkRegion, hkWindow, hkFull, hkRecord;
+        readonly List<FlatButton> fpsButtons = new List<FlatButton>();
         readonly TextBox txtFolder;
         readonly FlatButton fmtPng, fmtJpg;
         readonly List<TextBox> textBoxes = new List<TextBox>();
@@ -181,6 +182,7 @@ namespace SnapStudio
             hkRegion = HotkeyRow(pKeys, S.T("Modo captura (janela / região)", "Capture mode (window / region)"), s.HotkeyRegion, ref y, pw);
             hkWindow = HotkeyRow(pKeys, S.T("Janela ativa", "Active window"), s.HotkeyWindow, ref y, pw);
             hkFull = HotkeyRow(pKeys, S.T("Todos os ecrãs", "All screens"), s.HotkeyFull, ref y, pw);
+            hkRecord = HotkeyRow(pKeys, S.T("Gravar vídeo (iniciar / parar)", "Record video (start / stop)"), s.HotkeyRecord, ref y, pw);
             pKeys.Controls.Add(new ThemedLabel { Text = S.T("Clique na caixa e prima a combinação. Backspace limpa.", "Click a box and press the keys. Backspace clears."), Font = Theme.Font(12.5f * dpi), Location = new Point(Px(32), y + Px(6)) }.Muted());
 
             // Ficheiros
@@ -205,9 +207,27 @@ namespace SnapStudio
             pFiles.Controls.Add(fmtPng); pFiles.Controls.Add(fmtJpg);
             pFiles.Controls.Add(new ThemedLabel { Text = S.T("PNG mantém o texto nítido; JPG gera ficheiros mais pequenos.", "PNG keeps text crisp; JPG makes smaller files."), Font = Theme.Font(12.5f * dpi), Location = new Point(Px(32), y + Px(48)) }.Muted());
 
+            // Vídeo
+            var pVideo = Page(content, "video", S.T("Vídeo", "Video"));
+            y = Px(80);
+            Section(pVideo, S.T("Imagens por segundo", "Frames per second"), ref y);
+            int fx = Px(32);
+            foreach (int f in new[] { 15, 30, 60 })
+            {
+                var fb = new FlatButton { Kind = BtnKind.Secondary, Text = f + " fps", Size = new Size(Px(90), Px(38)), Location = new Point(fx, y), Checked = s.VideoFps == f, Tag = f };
+                fb.Click += delegate { foreach (var o in fpsButtons) o.Checked = o == fb; };
+                fpsButtons.Add(fb);
+                pVideo.Controls.Add(fb);
+                fx += Px(98);
+            }
+            pVideo.Controls.Add(new ThemedLabel { Text = S.T("30 fps chega para demonstrações; 60 fps fica mais fluido mas gera ficheiros maiores.", "30 fps is fine for demos; 60 fps is smoother but makes bigger files."), Font = Theme.Font(12.5f * dpi), Location = new Point(Px(32), y + Px(48)) }.Muted());
+            y += Px(92);
+            tCursor = Toggle(pVideo, S.T("Mostrar o cursor do rato", "Show the mouse pointer"), null, s.VideoCursor, ref y, pw);
+            pVideo.Controls.Add(new ThemedLabel { Text = S.T("Os vídeos são guardados em MP4 (H.264) na pasta das capturas, sem som.", "Videos are saved as MP4 (H.264) in the captures folder, without sound."), Font = Theme.Font(12.5f * dpi), Location = new Point(Px(32), y + Px(6)) }.Muted());
+
             // botões de navegação
             int ny = Px(70);
-            foreach (var kv in new[] { new[] { "general", S.T("Geral", "General") }, new[] { "look", S.T("Aparência", "Appearance") }, new[] { "after", S.T("Depois de capturar", "After capture") }, new[] { "keys", S.T("Atalhos", "Shortcuts") }, new[] { "files", S.T("Ficheiros", "Files") } })
+            foreach (var kv in new[] { new[] { "general", S.T("Geral", "General") }, new[] { "look", S.T("Aparência", "Appearance") }, new[] { "after", S.T("Depois de capturar", "After capture") }, new[] { "keys", S.T("Atalhos", "Shortcuts") }, new[] { "files", S.T("Ficheiros", "Files") }, new[] { "video", S.T("Vídeo", "Video") } })
             {
                 string key = kv[0];
                 var b = new FlatButton { Kind = BtnKind.Nav, Text = kv[1], Size = new Size(Px(196), Px(40)), Location = new Point(Px(12), ny), Font = Theme.Font(14 * dpi), Tag = key };
@@ -315,6 +335,9 @@ namespace SnapStudio
             s.HotkeyRegion = hkRegion.Value;
             s.HotkeyWindow = hkWindow.Value;
             s.HotkeyFull = hkFull.Value;
+            s.HotkeyRecord = hkRecord.Value;
+            foreach (var fb in fpsButtons) if (fb.Checked) s.VideoFps = (int)fb.Tag;
+            s.VideoCursor = tCursor.Checked;
             s.ThemeMode = theme;
             s.Accent = accent;
             try { Settings.StartWithWindows = tStartup.Checked; } catch { }

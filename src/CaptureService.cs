@@ -42,6 +42,23 @@ namespace SnapStudio
             return CaptureScreen(r);
         }
 
+        /// <summary>Escolher uma zona do ecrã (para gravar vídeo). Devolve coordenadas de ecrã, ou null se cancelado.</summary>
+        public static Rectangle? SelectArea(string hint)
+        {
+            Rectangle vs = VirtualScreen;
+            var windows = Native.GetVisibleWindows();
+            using (var full = CaptureScreen(vs))
+            using (var sel = new RegionSelector(full, windows, vs, hint))
+            {
+                if (sel.ShowDialog() != DialogResult.OK) return null;
+                Rectangle r = sel.Selection;
+                r.Intersect(new Rectangle(0, 0, full.Width, full.Height));
+                if (r.Width <= 0 || r.Height <= 0) return null;
+                r.Offset(vs.X, vs.Y);
+                return r;
+            }
+        }
+
         /// <summary>Modo captura: ecrã congelado onde se escolhe janela, região ou ecrã inteiro. Devolve null se cancelado.</summary>
         public static Bitmap SelectRegion()
         {
