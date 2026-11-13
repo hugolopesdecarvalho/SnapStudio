@@ -22,6 +22,8 @@ namespace SnapStudio
         [DataMember] public string ThemeMode;         // system | light | dark
         [DataMember] public string Accent;            // indigo | blue | teal | orange | windows
         [DataMember] public string AfterCapture;      // quick | full | none
+        [DataMember] public int PanelWidth;           // tamanho do painel da bandeja (px lógicos; 0 = omissão)
+        [DataMember] public int PanelHeight;
 
         public bool IsNew;
 

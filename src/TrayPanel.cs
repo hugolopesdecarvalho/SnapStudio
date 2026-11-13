@@ -49,8 +49,11 @@ namespace SnapStudio
             using (var b = new SolidBrush(Theme.Surface2)) g.FillRectangle(b, ir);
             if (Image != null)
             {
+                // "cobrir": preenche a área sem deformar, alinhado ao topo
                 g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                g.DrawImage(Image, ir);
+                float sc = Math.Max(ir.Width / (float)Image.Width, ir.Height / (float)Image.Height);
+                float w = Image.Width * sc, h = Image.Height * sc;
+                g.DrawImage(Image, new RectangleF((ir.Width - w) / 2f, 0, w, h));
             }
             g.Restore(st);
             using (var p = new Pen(Theme.Border)) g.DrawLine(p, 0, ih, Width, ih);
@@ -60,15 +63,23 @@ namespace SnapStudio
         }
     }
 
-    /// <summary>Painel que abre por cima do relógio ao clicar no ícone da bandeja.</summary>
+    /// <summary>
+    /// Painel que abre por cima do relógio ao clicar no ícone da bandeja.
+    /// Redimensionável pelas bordas de cima e da esquerda; o tamanho fica guardado.
+    /// </summary>
     class TrayPanel : Form
     {
+        const int DefaultW = 460, DefaultH = 620, MinW = 360, MinH = 500, MaxTiles = 40;
+
         readonly float dpi;
         readonly FlatButton btnTheme, btnSettings, btnCapture, btnFull, btnWindow, btnDelay, btnHistory, btnOpen, btnFolder, btnExit;
         readonly ToggleRow swEditor;
         readonly ThemedPanel footer;
         readonly List<ThumbTile> tiles = new List<ThumbTile>();
+        readonly ToolTip tips = new ToolTip();
         int yLine1, yRecent, yClip, yLine2, yFooter;
+        int visibleTiles;
+        Size tileSize;
         bool clipVisible;
         DateTime lastHidden = DateTime.MinValue;
 
@@ -89,73 +100,177 @@ namespace SnapStudio
             Text = "SnapStudio";
             Font = Theme.Font(13 * dpi);
             SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.ResizeRedraw, true);
+            MinimumSize = new Size(Px(MinW), Px(MinH));
 
-            int W = Px(384), pad = Px(14);
-            btnTheme = new FlatButton { Kind = BtnKind.Ghost, Size = new Size(Px(36), Px(36)), Location = new Point(W - pad - Px(76), Px(10)) };
+            btnTheme = new FlatButton { Kind = BtnKind.Ghost, Size = new Size(Px(36), Px(36)) };
             btnTheme.Click += delegate { TrayApp.Instance.ToggleTheme(); };
-            btnSettings = new FlatButton { Kind = BtnKind.Ghost, IconName = "settings", Size = new Size(Px(36), Px(36)), Location = new Point(W - pad - Px(36), Px(10)), AccessibleName = S.T("Definições", "Settings") };
+            btnSettings = new FlatButton { Kind = BtnKind.Ghost, IconName = "settings", Size = new Size(Px(36), Px(36)), AccessibleName = S.T("Definições", "Settings") };
             btnSettings.Click += delegate { HideNow(); TrayApp.Instance.ShowSettings(); };
+            tips.SetToolTip(btnSettings, S.T("Definições", "Settings"));
 
-            int y = Px(60);
-            btnCapture = new FlatButton { Kind = BtnKind.Primary, IconName = "region", IconSize = 20, Text = S.T("Capturar janela ou região", "Capture window or region"), Size = new Size(W - 2 * pad, Px(56)), Location = new Point(pad, y), Font = Theme.Font(14.5f * dpi) };
+            // botões de captura compactos
+            btnCapture = new FlatButton { Kind = BtnKind.Primary, IconName = "region", IconSize = 18, Text = S.T("Capturar janela ou região", "Capture window or region"), Badge = "PrtScn", Font = Theme.Font(13.5f * dpi) };
             btnCapture.Click += delegate { DoCapture(CaptureMode.Region, 250); };
-            y += Px(56) + Px(8);
-            int bw = (W - 2 * pad - 2 * Px(8)) / 3;
-            btnFull = SmallVertical("full", S.T("Ecrã inteiro", "Full screen"), pad, y, bw);
+            btnFull = Compact("full", S.T("Ecrã inteiro", "Full screen"), S.T("Capturar todos os ecrãs", "Capture all screens"));
             btnFull.Click += delegate { DoCapture(CaptureMode.FullScreen, 250); };
-            btnWindow = SmallVertical("window", S.T("Janela ativa", "Active window"), pad + bw + Px(8), y, bw);
+            btnWindow = Compact("window", S.T("Janela ativa", "Active window"), S.T("Capturar a janela que estava ativa", "Capture the window that was active"));
             btnWindow.Click += delegate { DoCapture(CaptureMode.ActiveWindow, 400); };
-            btnDelay = SmallVertical("timer", S.T("Atraso 3 s", "3 s delay"), pad + 2 * (bw + Px(8)), y, bw);
+            btnDelay = Compact("timer", S.T("Atraso 3 s", "3 s delay"), S.T("Modo captura daqui a 3 segundos", "Capture mode in 3 seconds"));
             btnDelay.Click += delegate { DoCapture(CaptureMode.Region, 3000); };
-            y += Px(64) + Px(14);
 
-            yLine1 = y;
-            y += Px(10);
-            yRecent = y;
-            btnHistory = new FlatButton { Kind = BtnKind.Ghost, Text = S.T("Ver histórico", "View history"), Size = new Size(Px(116), Px(28)), Location = new Point(W - pad - Px(116), y - Px(2)), Font = Theme.Font(13 * dpi) };
+            btnHistory = new FlatButton { Kind = BtnKind.Ghost, Text = S.T("Ver histórico", "View history"), Font = Theme.Font(13 * dpi) };
+            btnHistory.Size = new Size(btnHistory.PreferredWidth, Px(28));
             btnHistory.Click += delegate { HideNow(); TrayApp.Instance.ShowHistory(); };
-            y += Px(32);
-            int tw = (W - 2 * pad - 2 * Px(8)) / 3, th = Px(86);
-            for (int i = 0; i < 6; i++)
-            {
-                var t = new ThumbTile { Size = new Size(tw, th), Location = new Point(pad + (i % 3) * (tw + Px(8)), y + (i / 3) * (th + Px(8))) };
-                t.Click += delegate { if (t.Path != null) { HideNow(); TrayApp.Instance.OpenQuickEditor(t.Path, null); } };
-                tiles.Add(t);
-            }
-            y += 2 * th + Px(8) + Px(12);
-            yClip = y;
-            y += Px(44) + Px(10);
-            yLine2 = y;
-            swEditor = new ToggleRow { Text = S.T("Abrir no editor depois de capturar", "Open in the editor after capture"), Size = new Size(W - 2 * Px(16), Px(44)), Location = new Point(Px(16), y) };
+
+            swEditor = new ToggleRow { Text = S.T("Abrir no editor depois de capturar", "Open in the editor after capture") };
             swEditor.CheckedChanged += delegate
             {
                 var st = TrayApp.Instance.Settings;
                 string v = swEditor.Checked ? (st.AfterCapture == "full" ? "full" : "quick") : "none";
                 if (st.AfterCapture != v) { st.AfterCapture = v; try { st.Save(); } catch { } }
             };
-            y += Px(44);
-            yFooter = y;
-            footer = new ThemedPanel { Back = () => Theme.Dark ? Theme.Surface : Theme.Surface2, BorderTop = true, Location = new Point(1, y), Size = new Size(W - 2, Px(52) - 1) };
-            btnOpen = new FlatButton { Kind = BtnKind.Ghost, Text = S.T("Abrir imagem…", "Open image…"), Size = new Size(Px(120), Px(36)), Location = new Point(Px(10), Px(8)) };
-            btnOpen.Click += delegate { HideNow(); TrayApp.Instance.OpenImageDialog(); };
-            btnFolder = new FlatButton { Kind = BtnKind.Ghost, Text = S.T("Pasta", "Folder"), Size = new Size(Px(70), Px(36)), Location = new Point(Px(134), Px(8)) };
-            btnFolder.Click += delegate { HideNow(); TrayApp.Instance.OpenFolder(); };
-            btnExit = new FlatButton { Kind = BtnKind.Ghost, Text = S.T("Sair", "Exit"), Size = new Size(Px(64), Px(36)), Location = new Point(W - Px(76), Px(8)) };
-            btnExit.Click += delegate { HideNow(); TrayApp.Instance.Exit(); };
-            y += Px(52);
 
-            ClientSize = new Size(W, y);
+            footer = new ThemedPanel { Back = () => Theme.Dark ? Theme.Surface : Theme.Surface2, BorderTop = true };
+            btnOpen = new FlatButton { Kind = BtnKind.Ghost, Text = S.T("Abrir imagem…", "Open image…") };
+            btnOpen.Size = new Size(btnOpen.PreferredWidth, Px(36));
+            btnOpen.Click += delegate { HideNow(); TrayApp.Instance.OpenImageDialog(); };
+            btnFolder = new FlatButton { Kind = BtnKind.Ghost, Text = S.T("Pasta", "Folder") };
+            btnFolder.Size = new Size(btnFolder.PreferredWidth, Px(36));
+            btnFolder.Click += delegate { HideNow(); TrayApp.Instance.OpenFolder(); };
+            btnExit = new FlatButton { Kind = BtnKind.Ghost, Text = S.T("Sair", "Exit") };
+            btnExit.Size = new Size(btnExit.PreferredWidth, Px(36));
+            btnExit.Click += delegate { HideNow(); TrayApp.Instance.Exit(); };
             footer.Controls.AddRange(new Control[] { btnOpen, btnFolder, btnExit });
+
             Controls.AddRange(new Control[] { btnTheme, btnSettings, btnCapture, btnFull, btnWindow, btnDelay, btnHistory, swEditor, footer });
-            foreach (var t in tiles) Controls.Add(t);
+
+            var st0 = TrayApp.Instance != null ? TrayApp.Instance.Settings : null;
+            int w = st0 != null && st0.PanelWidth > 0 ? st0.PanelWidth : DefaultW;
+            int h = st0 != null && st0.PanelHeight > 0 ? st0.PanelHeight : DefaultH;
+            ClientSize = new Size(Px(Math.Max(MinW, w)), Px(Math.Max(MinH, h)));
 
             Theme.Changed += ApplyTheme;
             ApplyTheme();
+            DoLayout();
         }
 
-        FlatButton SmallVertical(string icon, string text, int x, int y, int w)
+        FlatButton Compact(string icon, string text, string tip)
         {
-            return new FlatButton { Kind = BtnKind.Secondary, IconName = icon, Text = text, Vertical = true, Size = new Size(w, Px(64)), Location = new Point(x, y), Font = Theme.Font(12.5f * dpi) };
+            var b = new FlatButton { Kind = BtnKind.Secondary, IconName = icon, IconSize = 16, Text = text, Font = Theme.Font(12.5f * dpi), Radius = 7 };
+            tips.SetToolTip(b, tip);
+            return b;
+        }
+
+        // ================= disposição =================
+
+        void DoLayout()
+        {
+            if (btnCapture == null) return;
+            int W = ClientSize.Width, H = ClientSize.Height, pad = Px(14), gap = Px(8);
+
+            btnSettings.Location = new Point(W - pad - Px(36), Px(10));
+            btnTheme.Location = new Point(W - pad - Px(76), Px(10));
+
+            int y = Px(58);
+            btnCapture.Bounds = new Rectangle(pad, y, W - 2 * pad, Px(40));
+            y += Px(40) + Px(6);
+            int bw = (W - 2 * pad - 2 * Px(6)) / 3;
+            btnFull.Bounds = new Rectangle(pad, y, bw, Px(34));
+            btnWindow.Bounds = new Rectangle(pad + bw + Px(6), y, bw, Px(34));
+            btnDelay.Bounds = new Rectangle(pad + 2 * (bw + Px(6)), y, W - 2 * pad - 2 * (bw + Px(6)), Px(34));
+            y += Px(34) + Px(14);
+
+            yLine1 = y;
+            y += Px(10);
+            yRecent = y;
+            btnHistory.Location = new Point(W - pad - btnHistory.Width, y - Px(2));
+            y += Px(32);
+
+            // parte de baixo, fixa
+            int footerH = Px(52);
+            yFooter = H - footerH;
+            yLine2 = yFooter - Px(44);
+            yClip = yLine2 - Px(10) - Px(44);
+            footer.Bounds = new Rectangle(1, yFooter, W - 2, footerH - 1);
+            btnOpen.Location = new Point(Px(10), Px(8));
+            btnFolder.Location = new Point(btnOpen.Right + Px(4), Px(8));
+            btnExit.Location = new Point(footer.Width - Px(10) - btnExit.Width, Px(8));
+            swEditor.Bounds = new Rectangle(Px(16), yLine2, W - 2 * Px(16), Px(44));
+
+            // grelha de recentes: colunas pela largura, linhas pela altura disponível
+            int availW = W - 2 * pad, availH = yClip - Px(12) - y;
+            int cols = Math.Max(2, (availW + gap) / (Px(120) + gap));
+            int tw = (availW - gap * (cols - 1)) / cols;
+            int th = (int)(tw * 0.58f) + Px(24);
+            int rows = Math.Max(1, (availH + gap) / (th + gap));
+            int count = Math.Min(MaxTiles, cols * rows);
+
+            while (tiles.Count < count)
+            {
+                var t = new ThumbTile();
+                t.Click += delegate { if (t.Path != null) { HideNow(); TrayApp.Instance.OpenQuickEditor(t.Path, null); } };
+                tiles.Add(t);
+                Controls.Add(t);
+            }
+            for (int i = 0; i < tiles.Count; i++)
+            {
+                var t = tiles[i];
+                if (i < count)
+                {
+                    t.Bounds = new Rectangle(pad + (i % cols) * (tw + gap), y + (i / cols) * (th + gap), tw, th);
+                    t.Visible = true;
+                }
+                else t.Visible = false;
+            }
+            bool changed = count != visibleTiles || tileSize != new Size(tw, th);
+            visibleTiles = count;
+            tileSize = new Size(tw, th);
+            Invalidate();
+            if (changed && Visible && !resizing) LoadRecents();
+        }
+
+        bool resizing;
+
+        protected override void OnResize(EventArgs e) { base.OnResize(e); DoLayout(); }
+        protected override void OnResizeBegin(EventArgs e) { resizing = true; base.OnResizeBegin(e); }
+
+        protected override void OnResizeEnd(EventArgs e)
+        {
+            base.OnResizeEnd(e);
+            resizing = false;
+            LoadRecents();
+            var st = TrayApp.Instance != null ? TrayApp.Instance.Settings : null;
+            if (st != null && !TrayApp.Instance.Headless)
+            {
+                st.PanelWidth = (int)Math.Round(ClientSize.Width / dpi);
+                st.PanelHeight = (int)Math.Round(ClientSize.Height / dpi);
+                try { st.Save(); } catch { }
+            }
+        }
+
+        // ================= redimensionar pelas bordas (janela sem moldura) =================
+
+        protected override void WndProc(ref Message m)
+        {
+            const int WM_NCHITTEST = 0x84, HTCLIENT = 1, HTLEFT = 10, HTRIGHT = 11, HTTOP = 12, HTTOPLEFT = 13, HTTOPRIGHT = 14;
+            if (m.Msg == WM_NCHITTEST)
+            {
+                base.WndProc(ref m);
+                if ((int)m.Result == HTCLIENT)
+                {
+                    long lp = m.LParam.ToInt64();
+                    var p = PointToClient(new Point((short)(lp & 0xffff), (short)((lp >> 16) & 0xffff)));
+                    int g = Px(7);
+                    bool left = p.X < g, right = p.X >= ClientSize.Width - g, top = p.Y < g;
+                    if (top && left) m.Result = (IntPtr)HTTOPLEFT;
+                    else if (top && right) m.Result = (IntPtr)HTTOPRIGHT;
+                    else if (left) m.Result = (IntPtr)HTLEFT;
+                    else if (right) m.Result = (IntPtr)HTRIGHT;
+                    else if (top) m.Result = (IntPtr)HTTOP;
+                }
+                return;
+            }
+            base.WndProc(ref m);
         }
 
         protected override CreateParams CreateParams
@@ -180,7 +295,9 @@ namespace SnapStudio
             if (IsDisposed) return;
             BackColor = Theme.Panel;
             btnTheme.IconName = Theme.Dark ? "sun" : "moon";
-            btnTheme.AccessibleName = Theme.Dark ? S.T("Mudar para tema claro", "Switch to light theme") : S.T("Mudar para tema escuro", "Switch to dark theme");
+            string tt = Theme.Dark ? S.T("Mudar para tema claro", "Switch to light theme") : S.T("Mudar para tema escuro", "Switch to dark theme");
+            btnTheme.AccessibleName = tt;
+            tips.SetToolTip(btnTheme, tt);
             Invalidate(true);
         }
 
@@ -209,8 +326,10 @@ namespace SnapStudio
         public void ShowPanel()
         {
             Prepare();
-
             Rectangle wa = Screen.FromPoint(Cursor.Position).WorkingArea;
+            int w = Math.Min(Width, wa.Width - Px(24)), h = Math.Min(Height, wa.Height - Px(24));
+            if (w != Width || h != Height) Size = new Size(w, h);
+            MaximumSize = new Size(wa.Width - Px(24), wa.Height - Px(24));
             Location = new Point(wa.Right - Width - Px(12), wa.Bottom - Height - Px(12));
             Show();
             Activate();
@@ -228,6 +347,7 @@ namespace SnapStudio
         protected override void OnDeactivate(EventArgs e)
         {
             base.OnDeactivate(e);
+            if (resizing) return;
             HideNow();
         }
 
@@ -245,40 +365,46 @@ namespace SnapStudio
                 string folder = TrayApp.Instance.Settings.OutputFolder;
                 string[] exts = { ".png", ".jpg", ".jpeg", ".bmp", ".gif" };
                 files = Directory.Exists(folder)
-                    ? new DirectoryInfo(folder).EnumerateFiles().Where(f => exts.Contains(f.Extension.ToLowerInvariant())).OrderByDescending(f => f.LastWriteTime).Take(6).ToList()
+                    ? new DirectoryInfo(folder).EnumerateFiles().Where(f => exts.Contains(f.Extension.ToLowerInvariant())).OrderByDescending(f => f.LastWriteTime).Take(visibleTiles).ToList()
                     : new List<FileInfo>();
             }
             catch { files = new List<FileInfo>(); }
 
+            Size sz = new Size(Math.Max(1, tileSize.Width), Math.Max(1, tileSize.Height - Px(24)));
             var todo = new List<KeyValuePair<ThumbTile, string>>();
             for (int i = 0; i < tiles.Count; i++)
             {
                 var t = tiles[i];
-                if (i < files.Count)
+                if (i < files.Count && i < visibleTiles)
                 {
                     var f = files[i];
                     t.Path = f.FullName;
                     t.Caption = Ago(f.LastWriteTime);
                     t.AccessibleName = f.Name;
-                    string key = f.FullName + "|" + f.LastWriteTimeUtc.Ticks;
+                    tips.SetToolTip(t, f.Name);
+                    string key = f.FullName + "|" + f.LastWriteTimeUtc.Ticks + "|" + sz.Width;
                     Bitmap b;
                     if (thumbCache.TryGetValue(key, out b)) t.Image = b;
-                    else { t.Image = null; todo.Add(new KeyValuePair<ThumbTile, string>(t, key)); }
-                    t.Visible = true;
+                    else
+                    {
+                        // enquanto carrega, reaproveitar uma miniatura de outro tamanho, se existir
+                        string prefix = f.FullName + "|" + f.LastWriteTimeUtc.Ticks + "|";
+                        t.Image = thumbCache.Where(kv => kv.Key.StartsWith(prefix)).Select(kv => kv.Value).FirstOrDefault();
+                        todo.Add(new KeyValuePair<ThumbTile, string>(t, key));
+                    }
                 }
                 else { t.Path = null; t.Image = null; t.Caption = ""; }
                 t.Invalidate();
             }
 
             int ver = ++loadVersion;
-            Size sz = new Size(tiles[0].Width, tiles[0].Height - Px(24));
             if (todo.Count == 0) return;
             ThreadPool.QueueUserWorkItem(delegate
             {
                 foreach (var kv in todo)
                 {
                     if (ver != loadVersion) return;
-                    string path = kv.Value.Substring(0, kv.Value.LastIndexOf('|'));
+                    string path = kv.Value.Substring(0, kv.Value.IndexOf('|'));
                     Bitmap b = null;
                     Size dim;
                     try { b = ImageUtil.ThumbCover(path, sz, out dim); } catch { }
@@ -320,7 +446,6 @@ namespace SnapStudio
             {
                 g.DrawLine(p, 0, yLine1, W, yLine1);
                 g.DrawLine(p, 0, yLine2, W, yLine2);
-                g.DrawLine(p, 0, yFooter, W, yFooter);
             }
             TextRenderer.DrawText(g, S.T("Recentes", "Recent"), Theme.Font(13 * dpi, FontStyle.Bold), new Rectangle(Px(16), yRecent, Px(200), Px(24)), Theme.Text, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
 
@@ -335,16 +460,23 @@ namespace SnapStudio
             }
             else
             {
-                TextRenderer.DrawText(g, S.T("Dica: PrtScn entra em modo captura", "Tip: PrtScn enters capture mode"), Theme.Font(12.5f * dpi),
-                    Rectangle.Round(clip), Theme.Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter);
+                TextRenderer.DrawText(g, S.T("Dica: PrtScn entra em modo captura · arraste as bordas para aumentar o painel", "Tip: PrtScn enters capture mode · drag the edges to enlarge this panel"), Theme.Font(12 * dpi),
+                    Rectangle.Round(clip), Theme.Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.WordBreak);
             }
 
+            // pega de redimensionar no canto superior esquerdo
+            using (var p = new Pen(Theme.BorderStrong, 1.2f))
+            {
+                g.DrawLine(p, Px(4), Px(10), Px(10), Px(4));
+                g.DrawLine(p, Px(4), Px(14), Px(14), Px(4));
+            }
             using (var p = new Pen(Theme.BorderStrong)) g.DrawRectangle(p, 0, 0, W - 1, ClientSize.Height - 1);
         }
 
         protected override void Dispose(bool disposing)
         {
             Theme.Changed -= ApplyTheme;
+            if (disposing) tips.Dispose();
             base.Dispose(disposing);
         }
     }
