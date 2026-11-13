@@ -63,6 +63,7 @@ namespace SnapStudio
         /// <summary>Miniatura que cobre a área pedida (recorte central), e as dimensões originais.</summary>
         public static Bitmap ThumbCover(string path, Size size, out Size original)
         {
+            if (VideoFile.Is(path)) return VideoThumb(path, size, out original);
             byte[] bytes = File.ReadAllBytes(path);
             using (var ms = new MemoryStream(bytes))
             using (var img = Image.FromStream(ms, false, false))
@@ -82,6 +83,28 @@ namespace SnapStudio
                 }
                 return th;
             }
+        }
+
+        static Bitmap VideoThumb(string path, Size size, out Size original)
+        {
+            original = Size.Empty;
+            var th = new Bitmap(size.Width, size.Height, PixelFormat.Format32bppPArgb);
+            using (var g = Graphics.FromImage(th))
+            {
+                g.Clear(Color.FromArgb(40, 42, 48));
+                using (var src = VideoFile.Thumbnail(path, Math.Max(size.Width, size.Height)))
+                {
+                    if (src != null)
+                    {
+                        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                        float sc = Math.Max(size.Width / (float)src.Width, size.Height / (float)src.Height);
+                        float w = src.Width * sc, h = src.Height * sc;
+                        g.DrawImage(src, new RectangleF((size.Width - w) / 2f, (size.Height - h) / 2f, w, h));
+                    }
+                }
+                VideoFile.DrawPlayBadge(g, new RectangleF(0, 0, size.Width, size.Height));
+            }
+            return th;
         }
 
         public static Bitmap Thumbnail(string path, Size size)

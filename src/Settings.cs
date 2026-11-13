@@ -24,6 +24,9 @@ namespace SnapStudio
         [DataMember] public string AfterCapture;      // quick | full | none
         [DataMember] public int PanelWidth;           // tamanho do painel da bandeja (px lógicos; 0 = omissão)
         [DataMember] public int PanelHeight;
+        [DataMember] public int HotkeyRecord;         // iniciar/parar gravação de vídeo
+        [DataMember] public int VideoFps;
+        [DataMember] public bool VideoCursor;
 
         public bool IsNew;
 
@@ -43,6 +46,9 @@ namespace SnapStudio
             HotkeyWindow = (int)(Keys.PrintScreen | Keys.Alt);
             HotkeyFull = (int)(Keys.PrintScreen | Keys.Control);
             UsePrintScreen = true;
+            HotkeyRecord = (int)(Keys.PrintScreen | Keys.Shift);
+            VideoFps = 30;
+            VideoCursor = true;
             ThemeMode = "system";
             Accent = "indigo";
             AfterCapture = null; // definido em Load (migra o antigo OpenEditor)
@@ -93,6 +99,7 @@ namespace SnapStudio
                             s.AfterCapture = s.OpenEditor ? "quick" : "none";
                         if (s.ThemeMode != "light" && s.ThemeMode != "dark") s.ThemeMode = "system";
                         if (string.IsNullOrEmpty(s.Accent)) s.Accent = "indigo";
+                        if (s.VideoFps != 15 && s.VideoFps != 30 && s.VideoFps != 60) s.VideoFps = 30;
                         return s;
                     }
                 }
@@ -112,10 +119,13 @@ namespace SnapStudio
                 new DataContractJsonSerializer(typeof(Settings)).WriteObject(fs, this);
         }
 
-        public string NewCapturePath()
+        public string NewCapturePath() { return NewPath(Format == "jpg" ? ".jpg" : ".png"); }
+
+        public string NewVideoPath() { return NewPath(".mp4"); }
+
+        string NewPath(string ext)
         {
             Directory.CreateDirectory(OutputFolder);
-            string ext = Format == "jpg" ? ".jpg" : ".png";
             string b = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
             string p = Path.Combine(OutputFolder, b + ext);
             int i = 2;

@@ -72,7 +72,7 @@ namespace SnapStudio
         const int DefaultW = 460, DefaultH = 620, MinW = 360, MinH = 500, MaxTiles = 40;
 
         readonly float dpi;
-        readonly FlatButton btnTheme, btnSettings, btnCapture, btnFull, btnWindow, btnDelay, btnHistory, btnOpen, btnFolder, btnExit;
+        readonly FlatButton btnTheme, btnSettings, btnCapture, btnRecord, btnFull, btnWindow, btnDelay, btnHistory, btnOpen, btnFolder, btnExit;
         readonly ToggleRow swEditor;
         readonly ThemedPanel footer;
         readonly List<ThumbTile> tiles = new List<ThumbTile>();
@@ -111,6 +111,8 @@ namespace SnapStudio
             // botões de captura compactos
             btnCapture = new FlatButton { Kind = BtnKind.Primary, IconName = "region", IconSize = 18, Text = S.T("Capturar janela ou região", "Capture window or region"), Badge = "PrtScn", Font = Theme.Font(13.5f * dpi) };
             btnCapture.Click += delegate { DoCapture(CaptureMode.Region, 250); };
+            btnRecord = new FlatButton { Kind = BtnKind.Secondary, IconName = "record", IconSize = 18, Text = S.T("Gravar vídeo do ecrã", "Record screen video"), Font = Theme.Font(13 * dpi), Radius = 7 };
+            btnRecord.Click += delegate { HideNow(); TrayApp.Instance.ToggleRecording(); };
             btnFull = Compact("full", S.T("Ecrã inteiro", "Full screen"), S.T("Capturar todos os ecrãs", "Capture all screens"));
             btnFull.Click += delegate { DoCapture(CaptureMode.FullScreen, 250); };
             btnWindow = Compact("window", S.T("Janela ativa", "Active window"), S.T("Capturar a janela que estava ativa", "Capture the window that was active"));
@@ -142,7 +144,7 @@ namespace SnapStudio
             btnExit.Click += delegate { HideNow(); TrayApp.Instance.Exit(); };
             footer.Controls.AddRange(new Control[] { btnOpen, btnFolder, btnExit });
 
-            Controls.AddRange(new Control[] { btnTheme, btnSettings, btnCapture, btnFull, btnWindow, btnDelay, btnHistory, swEditor, footer });
+            Controls.AddRange(new Control[] { btnTheme, btnSettings, btnCapture, btnRecord, btnFull, btnWindow, btnDelay, btnHistory, swEditor, footer });
 
             var st0 = TrayApp.Instance != null ? TrayApp.Instance.Settings : null;
             int w = st0 != null && st0.PanelWidth > 0 ? st0.PanelWidth : DefaultW;
@@ -178,7 +180,9 @@ namespace SnapStudio
             btnFull.Bounds = new Rectangle(pad, y, bw, Px(34));
             btnWindow.Bounds = new Rectangle(pad + bw + Px(6), y, bw, Px(34));
             btnDelay.Bounds = new Rectangle(pad + 2 * (bw + Px(6)), y, W - 2 * pad - 2 * (bw + Px(6)), Px(34));
-            y += Px(34) + Px(14);
+            y += Px(34) + Px(6);
+            btnRecord.Bounds = new Rectangle(pad, y, W - 2 * pad, Px(36));
+            y += Px(36) + Px(14);
 
             yLine1 = y;
             y += Px(10);
@@ -319,6 +323,10 @@ namespace SnapStudio
         {
             var st = TrayApp.Instance.Settings;
             swEditor.Checked = st.AfterCapture != "none";
+            bool rec = TrayApp.Instance.IsRecording;
+            btnRecord.Text = rec ? S.T("Parar a gravação", "Stop recording") : S.T("Gravar vídeo do ecrã", "Record screen video");
+            btnRecord.IconName = rec ? "stop" : "record";
+            btnRecord.Badge = st.HotkeyRecord != 0 ? Settings.HotkeyText(st.HotkeyRecord) : null;
             try { clipVisible = Clipboard.ContainsImage(); } catch { clipVisible = false; }
             LoadRecents();
         }
@@ -363,7 +371,7 @@ namespace SnapStudio
             try
             {
                 string folder = TrayApp.Instance.Settings.OutputFolder;
-                string[] exts = { ".png", ".jpg", ".jpeg", ".bmp", ".gif" };
+                string[] exts = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".mp4" };
                 files = Directory.Exists(folder)
                     ? new DirectoryInfo(folder).EnumerateFiles().Where(f => exts.Contains(f.Extension.ToLowerInvariant())).OrderByDescending(f => f.LastWriteTime).Take(visibleTiles).ToList()
                     : new List<FileInfo>();
@@ -460,7 +468,7 @@ namespace SnapStudio
             }
             else
             {
-                TextRenderer.DrawText(g, S.T("Dica: PrtScn entra em modo captura · arraste as bordas para aumentar o painel", "Tip: PrtScn enters capture mode · drag the edges to enlarge this panel"), Theme.Font(12 * dpi),
+                TextRenderer.DrawText(g, S.T("Dica: PrtScn captura · Shift+PrtScn grava vídeo · arraste as bordas para aumentar o painel", "Tip: PrtScn captures · Shift+PrtScn records video · drag the edges to enlarge this panel"), Theme.Font(12 * dpi),
                     Rectangle.Round(clip), Theme.Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.WordBreak);
             }
 

@@ -36,7 +36,7 @@ namespace SnapStudio
 
         public Rectangle Selection;
 
-        public RegionSelector(Bitmap screenshot, List<Rectangle> screenWindows, Rectangle virtualScreen)
+        public RegionSelector(Bitmap screenshot, List<Rectangle> screenWindows, Rectangle virtualScreen, string hint = null)
         {
             original = screenshot;
             vs = virtualScreen;
@@ -71,16 +71,16 @@ namespace SnapStudio
                 if (r.Width > 0 && r.Height > 0) windows.Add(r);
             }
 
-            BuildBar();
+            BuildBar(hint);
         }
 
         Rectangle ToClient(Rectangle screenRect) { var r = screenRect; r.Offset(-vs.X, -vs.Y); return r; }
 
-        void BuildBar()
+        void BuildBar(string hint)
         {
             Screen scr = Screen.FromPoint(Cursor.Position);
             Rectangle mon = ToClient(scr.Bounds);
-            hintText = S.T("Clique numa janela ou arraste para selecionar uma região", "Click a window or drag to select a region");
+            hintText = hint ?? S.T("Clique numa janela ou arraste para selecionar uma região", "Click a window or drag to select a region");
 
             buttons.Add(new BarButton { Text = S.T("Ecrã inteiro  (Enter)", "Full screen  (Enter)"), Click = CaptureCurrentMonitor });
             if (Screen.AllScreens.Length > 1)

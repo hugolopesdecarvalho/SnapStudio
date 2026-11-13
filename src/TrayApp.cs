@@ -60,7 +60,7 @@ namespace SnapStudio
         public static TrayApp Instance;
         public Settings Settings;
 
-        const int HK_REGION = 1, HK_WINDOW = 2, HK_FULL = 3, HK_PRTSCN = 4;
+        const int HK_REGION = 1, HK_WINDOW = 2, HK_FULL = 3, HK_PRTSCN = 4, HK_RECORD = 5;
 
         readonly NotifyIcon tray;
         readonly MessageWindow msg;
@@ -69,7 +69,9 @@ namespace SnapStudio
         TrayPanel panel;
         HistoryForm history;
         SettingsForm settingsForm;
-        ToolStripMenuItem miRegion, miFull, miStartup;
+        ToolStripMenuItem miRegion, miFull, miStartup, miRecord;
+        ScreenRecording recording;
+        public bool IsRecording { get { return recording != null; } }
         string lastBalloonPath;
         bool capturing;
 
@@ -153,6 +155,8 @@ namespace SnapStudio
             m.Items.Add(miRegion);
             m.Items.Add(miFull);
             m.Items.Add(delay);
+            miRecord = new ToolStripMenuItem(S.T("Gravar vídeo do ecrã", "Record screen video"), ToolIcons.Get("record", s, ink), delegate { ToggleRecording(); });
+            m.Items.Add(miRecord);
             m.Items.Add(new ToolStripSeparator());
             m.Items.Add(new ToolStripMenuItem(S.T("Histórico de capturas", "Capture history"), ToolIcons.Get("history", s, ink), delegate { ShowHistory(); }));
             m.Items.Add(new ToolStripMenuItem(S.T("Abrir imagem…", "Open image…"), ToolIcons.Get("open", s, ink), delegate { OpenImageDialog(); }));
@@ -180,6 +184,8 @@ namespace SnapStudio
             int region = Settings.HotkeyRegion != 0 ? Settings.HotkeyRegion : (Settings.UsePrintScreen ? (int)Keys.PrintScreen : 0);
             miRegion.ShortcutKeyDisplayString = region != 0 ? Settings.HotkeyText(region) : null;
             miFull.ShortcutKeyDisplayString = Settings.HotkeyFull != 0 ? Settings.HotkeyText(Settings.HotkeyFull) : null;
+            miRecord.Text = IsRecording ? S.T("Parar a gravação", "Stop recording") : S.T("Gravar vídeo do ecrã", "Record screen video");
+            miRecord.ShortcutKeyDisplayString = Settings.HotkeyRecord != 0 ? Settings.HotkeyText(Settings.HotkeyRecord) : null;
         }
 
         void Balloon(string title, string text, ToolTipIcon icon, string path)
@@ -211,7 +217,8 @@ namespace SnapStudio
             reg(HK_REGION, Settings.HotkeyRegion);
             reg(HK_WINDOW, Settings.HotkeyWindow);
             reg(HK_FULL, Settings.HotkeyFull);
-            if (Settings.UsePrintScreen && Settings.HotkeyRegion != prt && Settings.HotkeyWindow != prt && Settings.HotkeyFull != prt)
+            reg(HK_RECORD, Settings.HotkeyRecord);
+            if (Settings.UsePrintScreen && Settings.HotkeyRegion != prt && Settings.HotkeyWindow != prt && Settings.HotkeyFull != prt && Settings.HotkeyRecord != prt)
                 reg(HK_PRTSCN, prt);
 
             if (!notify) return;
@@ -232,6 +239,7 @@ namespace SnapStudio
                 case HK_REGION: case HK_PRTSCN: StartCapture(CaptureMode.Region, 0, null); break;
                 case HK_WINDOW: StartCapture(CaptureMode.ActiveWindow, 0, null); break;
                 case HK_FULL: StartCapture(CaptureMode.FullScreen, 0, null); break;
+                case HK_RECORD: ToggleRecording(); break;
             }
         }
 
@@ -239,7 +247,7 @@ namespace SnapStudio
 
         public void StartCapture(CaptureMode mode, int delayMs, Form hideDuring)
         {
-            if (capturing) return;
+            if (capturing || recording != null) return;
             capturing = true;
             // um pop-up aberto guarda e fecha-se antes de capturar
             foreach (var ed in editors.Where(e => e.Compact).ToList()) ed.Close();
@@ -294,10 +302,91 @@ namespace SnapStudio
                         S.T("\nClique para editar.", "\nClick to edit."), ToolTipIcon.Info, path);
         }
 
+        // ================= vídeo =================
+
+        /// <summary>Inicia a gravação (escolhendo a zona) ou, se já estiver a gravar, pára e guarda.</summary>
+        public void ToggleRecording()
+        {
+            if (recording != null) { recording.Stop(); return; }
+            if (capturing) return;
+            capturing = true;
+            foreach (var ed in editors.Where(e => e.Compact).ToList()) ed.Close();
+            if (panel.Visible) panel.HideNow();
+            // dar tempo ao painel/menu para desaparecer antes de congelar o ecrã
+            var t = new Timer { Interval = 200 };
+            t.Tick += delegate { t.Stop(); t.Dispose(); BeginRecording(); };
+            t.Start();
+        }
+
+        void BeginRecording()
+        {
+            Rectangle? area;
+            try { area = CaptureService.SelectArea(S.T("Escolha o que gravar: clique numa janela ou arraste uma região", "Choose what to record: click a window or drag a region")); }
+            catch (Exception ex)
+            {
+                MessageBox.Show(S.T("Erro: ", "Error: ") + ex.Message, "SnapStudio", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                area = null;
+            }
+            finally { capturing = false; }
+            if (area == null) return;
+            if (area.Value.Width < 64 || area.Value.Height < 64)
+            {
+                Balloon(S.T("Zona demasiado pequena", "Area too small"), S.T("Escolha uma zona com pelo menos 64 × 64 pixels.", "Choose an area of at least 64 × 64 pixels."), ToolTipIcon.Warning, null);
+                return;
+            }
+            string path;
+            try { path = Settings.NewVideoPath(); }
+            catch (Exception ex) { MessageBox.Show(ex.Message, "SnapStudio", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
+            recording = new ScreenRecording(area.Value, path, Settings.VideoFps, Settings.VideoCursor);
+            recording.Ended += OnRecordingEnded;
+            tray.Text = S.T("SnapStudio — a gravar", "SnapStudio — recording");
+            recording.Begin();
+        }
+
+        void OnRecordingEnded(ScreenRecording r)
+        {
+            if (recording == r) recording = null;
+            tray.Text = "SnapStudio";
+            var rec = r.Recorder;
+            if (rec.Error != null)
+            {
+                MessageBox.Show(S.T("Não foi possível gravar o vídeo:\n\n", "Could not record the video:\n\n") + rec.Error.Message, "SnapStudio", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            if (rec.Cancelled || !File.Exists(rec.Path)) return;
+            if (Settings.CopyToClipboard)
+            {
+                // como ficheiro: cola-se no Teams, Outlook, Explorador…
+                try
+                {
+                    var sc = new System.Collections.Specialized.StringCollection();
+                    sc.Add(rec.Path);
+                    var data = new DataObject();
+                    data.SetFileDropList(sc);
+                    Clipboard.SetDataObject(data, true, 5, 100);
+                }
+                catch { }
+            }
+            long kb = 0;
+            try { kb = new FileInfo(rec.Path).Length / 1024; } catch { }
+            string size = kb >= 1024 ? (kb / 1024.0).ToString("0.0") + " MB" : Math.Max(1, kb) + " KB";
+            Balloon(S.T("Vídeo guardado", "Video saved"),
+                    Path.GetFileName(rec.Path) + "  ·  " + ScreenRecording.Format(r.Duration) + "  ·  " + size +
+                    (Settings.CopyToClipboard ? S.T("\nCopiado — cole com Ctrl+V. ", "\nCopied — paste with Ctrl+V. ") : "\n") +
+                    S.T("Clique para ver.", "Click to watch."), ToolTipIcon.Info, rec.Path);
+        }
+
+        public void OpenVideo(string path)
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true }); }
+            catch (Exception ex) { MessageBox.Show(S.T("Não foi possível abrir o vídeo: ", "Could not open the video: ") + ex.Message, "SnapStudio", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        }
+
         // ================= janelas =================
 
         public void OpenEditor(string path, Bitmap initial)
         {
+            if (VideoFile.Is(path)) { OpenVideo(path); return; }
             var ex = editors.FirstOrDefault(e => !e.Compact && !e.IsDisposed && string.Equals(e.FilePath, path, StringComparison.OrdinalIgnoreCase));
             if (ex != null)
             {
@@ -310,6 +399,7 @@ namespace SnapStudio
 
         public void OpenQuickEditor(string path, Bitmap initial)
         {
+            if (VideoFile.Is(path)) { OpenVideo(path); return; }
             foreach (var ed in editors.Where(e => e.Compact).ToList()) ed.Close();
             ShowEditor(new Func<EditorForm>(() => new EditorForm(path, initial, true)));
         }
@@ -370,6 +460,7 @@ namespace SnapStudio
 
         public void Exit()
         {
+            if (recording != null) recording.StopAndWait();
             foreach (var e in editors.ToList())
             {
                 e.Close();

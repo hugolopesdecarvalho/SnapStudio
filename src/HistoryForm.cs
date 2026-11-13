@@ -354,7 +354,7 @@ namespace SnapStudio
     /// <summary>Histórico de capturas: pesquisa, filtros e cartões.</summary>
     class HistoryForm : Form
     {
-        static readonly string[] Exts = { ".png", ".jpg", ".jpeg", ".bmp", ".gif" };
+        static readonly string[] Exts = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".mp4" };
         static readonly Dictionary<string, Bitmap> thumbCache = new Dictionary<string, Bitmap>();
         static readonly Dictionary<string, Size> dimCache = new Dictionary<string, Size>();
 
@@ -605,9 +605,10 @@ namespace SnapStudio
                 var sc = new StringCollection();
                 sc.AddRange(paths.ToArray());
                 data.SetFileDropList(sc);
-                if (paths.Count == 1) data.SetImage(ImageUtil.LoadNoLock(paths[0]));
+                if (paths.Count == 1 && !VideoFile.Is(paths[0])) data.SetImage(ImageUtil.LoadNoLock(paths[0]));
                 Clipboard.SetDataObject(data, true, 5, 100);
-                lblTip.Text = paths.Count == 1 ? S.T("Imagem copiada para a área de transferência.", "Image copied to the clipboard.")
+                lblTip.Text = paths.Count == 1 && VideoFile.Is(paths[0]) ? S.T("Vídeo copiado — cole com Ctrl+V no Teams, Outlook ou numa pasta.", "Video copied — paste with Ctrl+V into Teams, Outlook or a folder.")
+                           : paths.Count == 1 ? S.T("Imagem copiada para a área de transferência.", "Image copied to the clipboard.")
                                                : paths.Count + S.T(" ficheiros copiados.", " files copied.");
             }
             catch (Exception ex) { MessageBox.Show(this, ex.Message, "SnapStudio"); }
