@@ -71,13 +71,15 @@ final class Settings: Codable {
     var editorColor: UInt32 = 0               // última cor no editor (ARGB; 0 = omissão)
     var editorWidth: Int = 0
     var editorFont: Int = 0
+    var panelWidth: Int = 0                   // tamanho do painel da barra de menus (pontos; 0 = omissão)
+    var panelHeight: Int = 0
 
     var isNew = false
 
     enum CodingKeys: String, CodingKey {
         case outputFolder, format, copyToClipboard, showNotification, afterCapture, themeMode, accent
         case hotkeyRegion, hotkeyWindow, hotkeyFull, hotkeyRecord, videoFps, videoCursor
-        case editorColor, editorWidth, editorFont
+        case editorColor, editorWidth, editorFont, panelWidth, panelHeight
     }
 
     init() {}
@@ -102,6 +104,8 @@ final class Settings: Codable {
         editorColor = v(.editorColor, editorColor)
         editorWidth = v(.editorWidth, editorWidth)
         editorFont = v(.editorFont, editorFont)
+        panelWidth = v(.panelWidth, panelWidth)
+        panelHeight = v(.panelHeight, panelHeight)
     }
 
     static var defaultFolder: String {

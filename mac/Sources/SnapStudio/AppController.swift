@@ -8,7 +8,7 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
 
     var settings = Settings.load()
     private var statusItem: NSStatusItem!
-    private var popover: NSPopover!
+    private var panel: TrayPanelController!
     private var windows: [NSWindowController] = []
     private var historyWC: HostWindowController?
     private var settingsWC: HostWindowController?
@@ -37,10 +37,11 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
             b.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
 
-        popover = NSPopover()
-        popover.behavior = .transient
-        popover.animates = false
-        popover.contentViewController = NSHostingController(rootView: TrayPanelView())
+        panel = TrayPanelController()
+        // teste: abrir o painel logo ao arrancar
+        if CommandLine.arguments.contains("--show-panel") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in self?.togglePanel() }
+        }
 
         lastExternalApp = NSWorkspace.shared.frontmostApplication
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] n in
@@ -120,7 +121,7 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
     @objc private func statusClicked(_ sender: NSStatusBarButton) {
         let rightClick = NSApp.currentEvent?.type == .rightMouseUp || NSApp.currentEvent?.modifierFlags.contains(.control) == true
         if rightClick {
-            popover.performClose(nil)
+            closePanel()
             statusItem.menu = buildStatusMenu()
             statusItem.button?.performClick(nil)
             statusItem.menu = nil
@@ -129,16 +130,9 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
         togglePanel()
     }
 
-    func togglePanel() {
-        if popover.isShown { popover.performClose(nil); return }
-        guard let b = statusItem.button else { return }
-        NotificationCenter.default.post(name: .snapCapturesChanged, object: nil)
-        popover.show(relativeTo: b.bounds, of: b, preferredEdge: .minY)
-        popover.contentViewController?.view.window?.makeKey()
-        NSApp.activate(ignoringOtherApps: true)
-    }
+    func togglePanel() { panel.toggle(below: statusItem.button) }
 
-    func closePanel() { if popover?.isShown == true { popover.performClose(nil) } }
+    func closePanel() { panel?.hide() }
 
     private func buildStatusMenu() -> NSMenu {
         let m = NSMenu()
