@@ -1,47 +1,49 @@
 # SnapStudio
 
-Ferramenta de captura de ecrã para Windows. Um único `.exe`, sem instalação (.NET Framework 4.8, já incluído no Windows 10/11).
+Screen capture tool for Windows. A single `.exe`, no installation needed (.NET Framework 4.8, already included in Windows 10/11).
 
-> **Mac:** há uma versão nativa para macOS 14+ na pasta [`mac/`](mac/README.md), com as mesmas funções na barra de menus. Para a instalar: `cd mac && ./build.sh --install --run`.
+> **Mac:** a native version for macOS 14+ lives in the [`mac/`](mac/README.md) folder, with the same features in the menu bar. To install it: `cd mac && ./build.sh --install --run`.
 
-## Executar
-`bin\SnapStudio.exe` → fica junto ao relógio (bandeja).
-**Clique no ícone** para abrir o painel: capturar, ver as capturas recentes, mudar o tema, abrir o histórico. Botão direito: menu completo.
+The interface is in Portuguese when Windows is set to Portuguese, and in English otherwise.
 
-## Capturar
-| Tecla | Ação |
+## Run
+`bin\SnapStudio.exe` → the app sits next to the clock (system tray).
+**Click the icon** to open the panel: capture, see recent captures, switch theme, open the history. Right-click: full menu.
+
+## Capture
+| Key | Action |
 |---|---|
-| **PrtScn** | Modo captura: clique numa janela, arraste uma região, ou **Enter** = ecrã inteiro, **A** = todos os ecrãs, **Esc** = cancelar |
-| Alt+PrtScn | Janela ativa |
-| Ctrl+PrtScn | Todos os ecrãs |
-| Shift+PrtScn | Gravar vídeo do ecrã (iniciar / parar) |
+| **PrtScn** | Capture mode: click a window, drag a region, or **Enter** = full screen, **A** = all screens, **Esc** = cancel |
+| Alt+PrtScn | Active window |
+| Ctrl+PrtScn | All screens |
+| Shift+PrtScn | Record screen video (start / stop) |
 
-Depois de capturar, a imagem é guardada em `Imagens\SnapStudio`, **fica na área de transferência** (Ctrl+V em qualquer app) e abre, conforme as Definições:
-- **Editor rápido** (pop-up junto ao relógio): seta, caixa, texto, esbater, passos, recorte; *Copiar e fechar*. Esc ou clicar fora guarda e fecha.
-- **Editor completo**: todas as ferramentas, propriedades (cor, espessura, tamanho do texto) e lista de anotações.
-- **Nada**: só guardar e copiar, com notificação.
+After a capture, the image is saved to `Pictures\SnapStudio`, **copied to the clipboard** (Ctrl+V in any app) and, depending on Settings, opened in:
+- **Quick editor** (pop-up next to the clock): arrow, box, text, blur, steps, crop; *Copy and close*. Esc or clicking outside saves and closes.
+- **Full editor**: all tools, properties (color, width, text size) and the annotation list.
+- **Nothing**: just save and copy, with a notification.
 
-> Se outra app ou a Ferramenta de Recorte do Windows estiver a usar a tecla PrtScn, a SnapStudio avisa. Feche essa app, ou desligue em *Definições do Windows › Acessibilidade › Teclado › "Usar a tecla Print Screen para abrir a captura de ecrã"*.
+> If another screen capture app or the Windows Snipping Tool is using the PrtScn key, SnapStudio warns you. Close that app, or turn off *Windows Settings › Accessibility › Keyboard › "Use the Print screen key to open screen capture"*.
 
-## Gravar vídeo
-**Shift+PrtScn** (ou o botão *Gravar vídeo do ecrã* no painel) → escolha uma janela, uma região ou o ecrã inteiro, como no modo captura. Após uma contagem de 3 s começa a gravar: uma moldura vermelha marca a zona e uma barra flutuante mostra o tempo, com **Pausar**, **Parar** e **Cancelar**. Shift+PrtScn outra vez também pára.
+## Record video
+**Shift+PrtScn** (or the *Record screen video* button in the panel) → choose a window, a region or the full screen, as in capture mode. Recording starts after a 3-second countdown: a red frame marks the area and a floating bar shows the elapsed time, with **Pause**, **Stop** and **Cancel**. Pressing Shift+PrtScn again also stops it.
 
-O vídeo é guardado em MP4 (H.264) na pasta das capturas, copiado como ficheiro para a área de transferência (Ctrl+V no Teams, Outlook ou numa pasta) e aparece nos recentes e no histórico. A moldura e a barra não aparecem no vídeo. Usa o codificador do próprio Windows (Media Foundation): nada a instalar. Por agora grava sem som.
-Em *Definições › Vídeo*: 15/30/60 fps e mostrar ou não o cursor.
+The video is saved as MP4 (H.264) in the captures folder, copied to the clipboard as a file (Ctrl+V in Teams, Outlook or a folder) and shown in the recent captures and the history. The frame and the bar do not appear in the video. It uses Windows' own encoder (Media Foundation), so there is nothing to install. Audio is not recorded yet.
+In *Settings › Video*: 15/30/60 fps and whether to show the cursor.
 
 ## Editor
-Seta (A), Caixa (R), Texto (T), **Esbater** (B) e Pixelizar (X) para ocultar zonas, Marcador (H), Número de passo (N), Elipse (E), Linha (L), Desenho livre (P), Recortar (C), Selecionar/mover (V).
-Ctrl+S guardar · Ctrl+C copiar · Ctrl+Z/Ctrl+Y anular/refazer · Delete apaga · Shift ao desenhar = ângulos de 45°/quadrados · Ctrl+roda = zoom · botão "Arrastar" para largar a imagem no Outlook/Teams.
-As anotações continuam editáveis ao reabrir a captura.
+Arrow (A), Box (R), Text (T), **Blur** (B) and Pixelate (X) to hide areas, Highlighter (H), Step number (N), Ellipse (E), Line (L), Freehand (P), Crop (C), Select/move (V).
+Ctrl+S save · Ctrl+C copy · Ctrl+Z/Ctrl+Y undo/redo · Delete removes · Shift while drawing = 45° angles/squares · Ctrl+wheel = zoom · "Drag" button to drop the image into Outlook/Teams.
+Annotations stay editable when you reopen a capture.
 
-## Histórico
-Cartões com miniaturas agrupados por data, pesquisa (Ctrl+F), filtros (Hoje, Esta semana, Com anotações), ações ao passar o rato (copiar, editar, apagar), arrastar para outras apps, F2 para mudar o nome.
+## History
+Thumbnail cards grouped by date, search (Ctrl+F), filters (Today, This week, Annotated), hover actions (copy, edit, delete), drag to other apps, F2 to rename.
 
-## Definições
-Geral (iniciar com o Windows, usar PrtScn), Aparência (tema claro/escuro/igual ao Windows, cor de destaque), Depois de capturar, Atalhos, Ficheiros (pasta e formato PNG/JPG), Vídeo (fps, cursor).
+## Settings
+General (start with Windows, use PrtScn), Appearance (light/dark/same as Windows theme, accent color), After capture, Shortcuts, Files (folder and PNG/JPG format), Video (fps, cursor).
 
-## Compilar
+## Build
 ```
 powershell -ExecutionPolicy Bypass -File build.ps1
 ```
-Não precisa de .NET SDK: usa o `csc.exe` do .NET Framework incluído no Windows. Código em `src\`. Dados do utilizador em `%APPDATA%\SnapStudio`.
+No .NET SDK needed: it uses the `csc.exe` from the .NET Framework that ships with Windows. Source code in `src\`. User data in `%APPDATA%\SnapStudio`.
