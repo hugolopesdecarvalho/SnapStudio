@@ -2,7 +2,12 @@
 
 Versão nativa para Mac (Swift, AppKit e SwiftUI) da SnapStudio. Tem as mesmas funções da versão Windows e vive na **barra de menus**. Requer macOS 14 (Sonoma) ou mais recente e corre nativamente em Apple Silicon e Intel.
 
-## Instalar e executar
+## Instalar a partir da release
+1. Descarregue **SnapStudio-macOS.zip** da página *Releases* do repositório e abra-o. O Finder extrai a `SnapStudio.app`.
+2. Arraste a `SnapStudio.app` para a pasta **Aplicações** e abra-a.
+3. A app não está notarizada pela Apple, por isso o macOS bloqueia-a na primeira vez. Vá a *Definições do Sistema › Privacidade e segurança*, desça até à mensagem sobre a SnapStudio e clique em **Abrir mesmo assim**. Só é preciso uma vez.
+
+## Compilar, instalar e executar
 ```bash
 cd mac
 ./build.sh --install --run
