@@ -2,6 +2,8 @@
 
 Ferramenta de captura de ecrã para Windows. Um único `.exe`, sem instalação (.NET Framework 4.8, já incluído no Windows 10/11).
 
+> **Mac:** há uma versão nativa para macOS 14+ na pasta [`mac/`](mac/README.md), com as mesmas funções na barra de menus. Para a instalar: `cd mac && ./build.sh --install --run`.
+
 ## Executar
 `bin\SnapStudio.exe` → fica junto ao relógio (bandeja).
 **Clique no ícone** para abrir o painel: capturar, ver as capturas recentes, mudar o tema, abrir o histórico. Botão direito: menu completo.
