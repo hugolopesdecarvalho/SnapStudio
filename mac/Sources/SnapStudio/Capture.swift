@@ -44,15 +44,27 @@ enum Capture {
 
     static var hasPermission: Bool { CGPreflightScreenCaptureAccess() }
 
-    /// Pede a permissão de Gravação do ecrã; se já foi recusada, explica como a dar.
-    static func ensurePermission() -> Bool {
+    /// Verificação fiável: pede a lista de ecrãs ao ScreenCaptureKit (só funciona com autorização).
+    static func verifyPermission() async -> Bool {
         if CGPreflightScreenCaptureAccess() { return true }
-        if CGRequestScreenCaptureAccess() { return true }
+        do { _ = try await shareable(); return true } catch { return false }
+    }
+
+    /// Erro de autorização do ScreenCaptureKit (o utilizador não deu acesso à Gravação do ecrã).
+    static func isPermissionError(_ error: Error) -> Bool {
+        let e = error as NSError
+        if e.domain == SCStreamErrorDomain && e.code == SCStreamError.Code.userDeclined.rawValue { return true }
+        return !CGPreflightScreenCaptureAccess() && e.domain == SCStreamErrorDomain
+    }
+
+    /// Explica como dar a autorização de Gravação do ecrã. Só é chamado quando o ScreenCaptureKit a recusa
+    /// (o CGPreflightScreenCaptureAccess pode dizer "não" mesmo com a app autorizada, por isso não serve de critério).
+    static func showPermissionAlert() {
         let a = NSAlert()
         a.messageText = S.t("Autorizar a gravação do ecrã", "Allow screen recording")
         a.informativeText = S.t(
-            "Para capturar o ecrã, ative a SnapStudio em Definições do Sistema › Privacidade e segurança › Gravação do ecrã e áudio do sistema. Depois feche e volte a abrir a SnapStudio.",
-            "To capture the screen, turn on SnapStudio in System Settings › Privacy & Security › Screen & System Audio Recording. Then quit and reopen SnapStudio.")
+            "Para capturar o ecrã, ative a SnapStudio em Definições do Sistema › Privacidade e segurança › Gravação do ecrã e áudio do sistema. Depois feche e volte a abrir a SnapStudio.\n\nSe a SnapStudio já aparece ativada, é de uma versão anterior: selecione-a, remova-a com “−” e volte a abrir a SnapStudio para a autorizar de novo.",
+            "To capture the screen, turn on SnapStudio in System Settings › Privacy & Security › Screen & System Audio Recording. Then quit and reopen SnapStudio.\n\nIf SnapStudio is already turned on, that entry belongs to an earlier version: select it, remove it with “−” and reopen SnapStudio to allow it again.")
         a.addButton(withTitle: S.t("Abrir Definições", "Open Settings"))
         a.addButton(withTitle: S.t("Cancelar", "Cancel"))
         NSApp.activate(ignoringOtherApps: true)
@@ -60,7 +72,6 @@ enum Capture {
            let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
             NSWorkspace.shared.open(url)
         }
-        return false
     }
 
     static func shareable() async throws -> SCShareableContent {

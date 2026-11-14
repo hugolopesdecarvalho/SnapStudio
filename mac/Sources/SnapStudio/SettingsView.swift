@@ -69,7 +69,10 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { st.permission = Capture.hasPermission; st.loginOn = Settings.startAtLogin }
+        .onAppear {
+            st.loginOn = Settings.startAtLogin
+            Task { @MainActor in st.permission = await Capture.verifyPermission() }
+        }
     }
 
     // ---------- Aparência ----------

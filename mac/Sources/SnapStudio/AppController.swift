@@ -275,7 +275,6 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
 
     func startCapture(_ mode: CaptureMode, delay: Double = 0) {
         if capturing || recording != nil { return }
-        guard Capture.ensurePermission() else { return }
         capturing = true
         // um pop-up aberto guarda e fecha-se antes de capturar
         for e in windows.compactMap({ $0 as? EditorWindowController }) where e.model.compact { e.saveAndClose() }
@@ -314,6 +313,7 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
             }
         } catch {
             capturing = false
+            if Capture.isPermissionError(error) { Capture.showPermissionAlert(); return }
             showError(S.t("Erro na captura: ", "Capture error: ") + error.localizedDescription)
             return
         }
@@ -346,7 +346,6 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
     func toggleRecording() {
         if let r = recording { r.stop(); return }
         if capturing { return }
-        guard Capture.ensurePermission() else { return }
         capturing = true
         for e in windows.compactMap({ $0 as? EditorWindowController }) where e.model.compact { e.saveAndClose() }
         closePanel()
@@ -364,6 +363,7 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
                                                    "Choose what to record: click a window or drag a region"), allowAll: false)
         } catch {
             capturing = false
+            if Capture.isPermissionError(error) { Capture.showPermissionAlert(); return }
             showError(S.t("Erro: ", "Error: ") + error.localizedDescription)
             return
         }
@@ -390,6 +390,7 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
         updateRecordingTitle(nil)
         NotificationCenter.default.post(name: .snapRecordingChanged, object: nil)
         if let e = r.error {
+            if Capture.isPermissionError(e) { Capture.showPermissionAlert(); return }
             showError(S.t("Não foi possível gravar o vídeo:\n\n", "Could not record the video:\n\n") + e.localizedDescription)
             return
         }

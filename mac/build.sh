@@ -10,7 +10,7 @@ cd "$(dirname "$0")"
 ROOT="$(pwd)"
 OUT="$ROOT/build"
 APP="$OUT/SnapStudio.app"
-VERSION="1.1.1"
+VERSION="1.1.2"
 
 RUN=0; INSTALL=0
 for a in "$@"; do
@@ -95,10 +95,18 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# assinatura local (ad hoc). Com um certificado "Developer ID" pode usar:
-#   SIGN_ID="Developer ID Application: ..." ./build.sh
+# Assinatura. Por omissão é ad hoc (sem certificado), mas com um requisito de identidade fixo
+# (o identificador da app): sem isto o macOS identifica a app pelo hash do binário, que muda a cada
+# compilação, e a autorização de Gravação do ecrã deixa de valer depois de atualizar.
+# Com um certificado "Developer ID":  SIGN_ID="Developer ID Application: ..." ./build.sh
 SIGN_ID="${SIGN_ID:--}"
-codesign --force --deep --options runtime --sign "$SIGN_ID" "$APP" >/dev/null 2>&1 || codesign --force --deep --sign - "$APP"
+if [ "$SIGN_ID" = "-" ]; then
+  codesign --force --deep --options runtime --sign - \
+    --requirements '=designated => identifier "com.snapstudio.mac"' "$APP"
+else
+  codesign --force --deep --options runtime --timestamp --sign "$SIGN_ID" "$APP"
+fi
+codesign --verify --deep --strict "$APP"
 echo "OK -> $APP"
 
 if [ "$INSTALL" = 1 ]; then

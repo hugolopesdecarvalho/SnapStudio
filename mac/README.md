@@ -20,7 +20,7 @@ Na primeira captura, o macOS pede autorização. Ative a SnapStudio em
 *Definições do Sistema › Privacidade e segurança › Gravação do ecrã e áudio do sistema* e volte a abrir a app.
 As *Definições › Geral* da SnapStudio mostram se a autorização está dada.
 
-> Cada nova compilação com assinatura ad hoc é vista pelo macOS como uma app diferente, por isso pode ter de voltar a autorizar depois de recompilar. Com um certificado *Developer ID* isto não acontece: `SIGN_ID="Developer ID Application: …" ./build.sh`.
+> A partir da 1.1.2, a app é assinada com uma identidade fixa (`com.snapstudio.mac`) e a autorização mantém-se ao atualizar ou recompilar. Se vem de uma versão anterior e a app continua a pedir autorização apesar de aparecer ativada, remova a entrada antiga com “−” nessa lista e autorize de novo (só uma vez). Para assinar com um certificado *Developer ID*: `SIGN_ID="Developer ID Application: …" ./build.sh`.
 
 ## Capturar
 No Mac não existe tecla PrtScn. Os atalhos por omissão evitam os do sistema (⌘⇧3/4/5, que continuam a funcionar) e podem ser mudados em *Definições › Atalhos*:
