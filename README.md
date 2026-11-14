@@ -13,7 +13,41 @@
   <a href="https://github.com/hugolopesdecarvalho/SnapStudio/releases/latest"><b>Download the latest release</b></a>
 </p>
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/editor-dark.png">
+    <img src="assets/screenshots/editor-light.png" width="860" alt="SnapStudio full editor with arrows, boxes, numbered steps, text and a blurred email address">
+  </picture>
+</p>
+
 ---
+
+## Screenshots
+<table>
+  <tr>
+    <td width="38%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/panel-dark.png">
+        <img src="assets/screenshots/panel-light.png" alt="Tray / menu bar panel with capture buttons and recent captures">
+      </picture>
+      <p align="center"><b>Panel</b><br>One click from the tray / menu bar.</p>
+    </td>
+    <td width="62%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/quick-editor-dark.png">
+        <img src="assets/screenshots/quick-editor-light.png" alt="Quick editor pop-up with a pixelated password field and an arrow">
+      </picture>
+      <p align="center"><b>Quick editor</b><br>Annotate, copy and close in seconds.</p>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/history-dark.png">
+        <img src="assets/screenshots/history-light.png" alt="Capture history grouped by day, with search and filters">
+      </picture>
+      <p align="center"><b>History</b><br>Search, filter and drag captures into other apps.</p>
+    </td>
+  </tr>
+</table>
+
+<sub>Screenshots of the macOS version. The Windows version has the same layout. All content shown is fictional.</sub>
 
 ## Features
 - **Capture mode**: freeze the screen, then click a window, drag a region, or capture the full screen or all screens. Active-window and 3-second delayed captures are also available.
@@ -101,4 +135,4 @@ cd mac && ./build.sh --install --run
 | `src/` | Windows version (C#, WinForms) |
 | `build.ps1`, `app.manifest` | Windows build script and manifest |
 | `mac/` | macOS version (Swift, AppKit, SwiftUI), with its own [README](mac/README.md) |
-| `assets/` | icon, logo and social preview image |
+| `assets/` | icon, logo, social preview image and screenshots |

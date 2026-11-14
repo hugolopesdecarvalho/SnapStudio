@@ -70,6 +70,13 @@ build/SnapStudio.app/Contents/MacOS/SnapStudio --render-test /tmp/snap-test
 ```
 This test draws every annotation on a synthetic image, checks serialization, geometry and blurring, and writes PNGs. `--ui-snapshot <folder> [light|dark]` renders the panel, the editors, the history and the settings off-screen.
 
+Repository images:
+```bash
+APP=build/SnapStudio.app/Contents/MacOS/SnapStudio
+$APP --readme-shots ../assets/screenshots   # real windows with fictional captures (needs Screen Recording permission)
+$APP --make-ico ../assets/app.ico           # Windows icon, same design as the Mac icon
+```
+
 ## Code (`Sources/SnapStudio`)
 | File | Windows equivalent | Contents |
 |---|---|---|

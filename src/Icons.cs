@@ -18,22 +18,32 @@ namespace SnapStudio
             {
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-                float m = n * 0.04f;
-                var r = new RectangleF(m, m, n - 2 * m, n - 2 * m);
-                using (var path = RoundRect(r, n * 0.22f))
-                using (var br = new LinearGradientBrush(r, Color.FromArgb(59, 130, 246), Color.FromArgb(109, 40, 217), 45f))
+                // Mesmo desenho da versão Mac (mac/Sources/SnapStudio/AppIcon.swift):
+                // fundo violeta, cantos de visor brancos e um ponto vermelho num círculo branco.
+                // Nos tamanhos pequenos (bandeja) a margem é menor para o ícone ficar legível.
+                float inset = n * (n <= 32 ? 0.04f : 0.09f);
+                var body = new RectangleF(inset, inset, n - 2 * inset, n - 2 * inset);
+                using (var path = RoundRect(body, body.Width * 0.225f))
+                using (var br = new LinearGradientBrush(body, Color.FromArgb(107, 92, 250), Color.FromArgb(66, 56, 209), 45f))
                     g.FillPath(br, path);
-                float w = Math.Max(1.5f, n * 0.085f);
-                float a = n * 0.25f, b = n * 0.75f, l = n * 0.17f;
+
+                float ci = body.Width * 0.2f;
+                var c = new RectangleF(body.X + ci, body.Y + ci, body.Width - 2 * ci, body.Height - 2 * ci);
+                float arm = c.Width * 0.28f;
+                float w = Math.Max(1.5f, n * 0.055f);
                 using (var p = new Pen(Color.White, w) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
                 {
-                    g.DrawLines(p, new[] { new PointF(a, a + l), new PointF(a, a), new PointF(a + l, a) });
-                    g.DrawLines(p, new[] { new PointF(b - l, a), new PointF(b, a), new PointF(b, a + l) });
-                    g.DrawLines(p, new[] { new PointF(b, b - l), new PointF(b, b), new PointF(b - l, b) });
-                    g.DrawLines(p, new[] { new PointF(a + l, b), new PointF(a, b), new PointF(a, b - l) });
+                    g.DrawLines(p, new[] { new PointF(c.Left, c.Top + arm), new PointF(c.Left, c.Top), new PointF(c.Left + arm, c.Top) });
+                    g.DrawLines(p, new[] { new PointF(c.Right - arm, c.Top), new PointF(c.Right, c.Top), new PointF(c.Right, c.Top + arm) });
+                    g.DrawLines(p, new[] { new PointF(c.Right, c.Bottom - arm), new PointF(c.Right, c.Bottom), new PointF(c.Right - arm, c.Bottom) });
+                    g.DrawLines(p, new[] { new PointF(c.Left + arm, c.Bottom), new PointF(c.Left, c.Bottom), new PointF(c.Left, c.Bottom - arm) });
                 }
-                float c = n * 0.11f;
-                g.FillEllipse(Brushes.White, n / 2f - c, n / 2f - c, 2 * c, 2 * c);
+
+                float cx = c.Left + c.Width / 2f, cy = c.Top + c.Height / 2f;
+                float r = c.Width * 0.2f, r2 = r * 0.45f;
+                g.FillEllipse(Brushes.White, cx - r, cy - r, 2 * r, 2 * r);
+                using (var red = new SolidBrush(Color.FromArgb(250, 82, 92)))
+                    g.FillEllipse(red, cx - r2, cy - r2, 2 * r2, 2 * r2);
             }
             return bmp;
         }
