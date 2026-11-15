@@ -1,5 +1,10 @@
 import AppKit
 import SwiftUI
+import os
+
+/// Registo de diagnóstico do modo captura (Consola: subsystem com.snapstudio.mac, categoria capture).
+/// Só tipos de evento e estado — nada do conteúdo do ecrã nem do que se escreve.
+let captureLog = Logger(subsystem: "com.snapstudio.mac", category: "capture")
 
 enum SelectionResult {
     case region(ScreenShot, CGRect)   // retângulo em pontos locais do ecrã (origem em baixo à esquerda)
@@ -25,6 +30,7 @@ final class RegionSelector {
         let sel = RegionSelector(shots: shots, allowAll: allowAll)
         current = sel
         sel.completion = completion
+        captureLog.notice("selector open: screens=\(shots.count) appActive=\(NSApp.isActive) frontmost=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?", privacy: .public)")
         let wins = Capture.visibleWindows()
         let hintText = hint ?? S.t("Clique numa janela ou arraste para selecionar uma região", "Click a window or drag to select a region")
         let mouse = NSEvent.mouseLocation
@@ -58,6 +64,9 @@ final class RegionSelector {
     }
 
     func finish(_ r: SelectionResult) {
+        let kind: String
+        switch r { case .region(_, let rect): kind = "region \(Int(rect.width))x\(Int(rect.height))"; case .allScreens: kind = "allScreens"; case .cancelled: kind = "cancelled" }
+        captureLog.notice("selector finish: \(kind, privacy: .public) pending=\(self.completion != nil)")
         guard let c = completion else { return }
         completion = nil
         for w in windows { w.orderOut(nil) }
@@ -106,7 +115,16 @@ final class OverlayWindow: NSPanel {
         animationBehavior = .none
     }
     override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
+
+    /// Diagnóstico: que eventos de rato/teclado chegam a esta janela (antes de irem para a vista).
+    override func sendEvent(_ event: NSEvent) {
+        switch event.type {
+        case .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp, .otherMouseDown, .keyDown:
+            captureLog.notice("overlay event: \(String(describing: event.type), privacy: .public) clicks=\(event.clickCount) key=\(self.isKeyWindow) appActive=\(NSApp.isActive)")
+        default: break
+        }
+        super.sendEvent(event)
+    }
 }
 
 final class OverlayView: NSView {
@@ -164,10 +182,14 @@ final class OverlayView: NSView {
         start = convert(event.locationInWindow, from: nil)
         dragging = false
         sel = nil
+        dragEvents = 0
+        captureLog.notice("view mouseDown")
     }
+    private var dragEvents = 0
 
     override func mouseDragged(with event: NSEvent) {
-        guard let s = start else { return }
+        dragEvents += 1
+        guard let s = start else { if dragEvents == 1 { captureLog.notice("view mouseDragged without mouseDown") }; return }
         let p = convert(event.locationInWindow, from: nil)
         if !dragging && Geo.dist(s, p) < 4 { return }
         dragging = true
@@ -176,6 +198,7 @@ final class OverlayView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        captureLog.notice("view mouseUp: hadMouseDown=\(self.start != nil) dragging=\(self.dragging) dragEvents=\(self.dragEvents)")
         defer { start = nil; dragging = false }
         if dragging, let r = sel {
             if r.width >= 4 && r.height >= 4 { owner?.finish(.region(shot, r.integral)); return }

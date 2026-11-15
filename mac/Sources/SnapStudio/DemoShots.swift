@@ -89,6 +89,49 @@ enum DemoShots {
         print("OK -> \(outDir.path)")
     }
 
+    /// `--history-test <pasta>`: testa a seleção múltipla do histórico (pasta temporária, definições só em memória).
+    static func historyTest(outDir: URL) -> Bool {
+        NSApplication.shared.setActivationPolicy(.accessory)
+        let fm = FileManager.default
+        try? fm.createDirectory(at: outDir, withIntermediateDirectories: true)
+        let dir = fm.temporaryDirectory.appendingPathComponent("SnapStudioHist-\(getpid())")
+        try? fm.removeItem(at: dir); try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: dir) }
+        AppController.shared.settings.outputFolder = dir.path
+        let arts = DemoArt.all()
+        for (i, (name, img)) in arts.enumerated() {
+            let u = dir.appendingPathComponent(name)
+            try? ImageUtil.save(img, to: u)
+            let d = Date().addingTimeInterval(TimeInterval(-600 * i))
+            try? fm.setAttributes([.creationDate: d, .modificationDate: d], ofItemAtPath: u.path)
+        }
+        let m = HistoryModel()
+        var ok = true
+        func check(_ c: Bool, _ msg: String) { if !c { print("FALHA: \(msg)"); ok = false } }
+        let f = m.filtered
+        check(f.count == 6, "6 capturas (\(f.count))")
+        m.click(f[0], modifiers: []); check(m.selection == [f[0].url], "clique simples")
+        m.click(f[2], modifiers: .command); check(m.selection.count == 2, "⌘-clique junta")
+        m.click(f[2], modifiers: .command); check(m.selection == [f[0].url], "⌘-clique retira")
+        m.click(f[1], modifiers: []); m.click(f[4], modifiers: .shift)
+        check(m.selection == Set(f[1...4].map { $0.url }), "⇧-clique intervalo (\(m.selection.count))")
+        check(m.targets(for: f[2]).count == 4 && m.targets(for: f[5]).count == 1, "ação aplica-se à seleção")
+        m.selectAll(); check(m.selection.count == 6, "⌘A")
+        // janela com 3 selecionadas, para ver o aspeto
+        m.clearSelection(); m.click(f[0], modifiers: []); m.click(f[2], modifiers: .command); m.click(f[3], modifiers: .command)
+        func pump(_ s: Double) { RunLoop.main.run(until: Date().addingTimeInterval(s)) }
+        let wc = HostWindowController(title: "History", size: CGSize(width: 1000, height: 640), root: AnyView(HistoryView(model: m)), resizable: true, autosave: nil)
+        wc.window?.center(); wc.window?.orderFrontRegardless(); pump(2)
+        shoot(wc.window!, outDir.appendingPathComponent("history-multi.png"))
+        wc.window?.orderOut(nil)
+        // apagar uma (sem diálogo)
+        m.clearSelection(); m.click(f[5], modifiers: [])
+        m.trash(m.selectedItems)
+        check(m.items.count == 5 && m.selection.isEmpty, "apagar uma (\(m.items.count))")
+        print(ok ? "OK — seleção múltipla do histórico" : "FALHAS")
+        return ok
+    }
+
     /// `--nav-test <pasta>`: testa imagem anterior/seguinte no editor completo, com 3 capturas fictícias.
     static func navTest(outDir: URL) -> Bool {
         NSApplication.shared.setActivationPolicy(.accessory)

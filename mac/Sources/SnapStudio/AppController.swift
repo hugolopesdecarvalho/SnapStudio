@@ -321,6 +321,7 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
     // ================= captura =================
 
     func startCapture(_ mode: CaptureMode, delay: Double = 0) {
+        captureLog.notice("startCapture mode=\(String(describing: mode), privacy: .public) capturing=\(self.capturing) recording=\(self.recording != nil)")
         if capturing || recording != nil { return }
         let ownWindowInFront = NSApp.isActive && NSApp.windows.contains { $0.isVisible && $0.level == .normal && !($0 is NSPanel) }
         activeAppPidAtRequest = ownWindowInFront ? getpid() : nil
@@ -368,6 +369,7 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
             return
         }
         capturing = false
+        captureLog.notice("capture result: \(img != nil ? "\(img!.width)x\(img!.height)" : "none", privacy: .public)")
         guard let image = img else { return }
         handleCapture(image, scale: scale)
     }

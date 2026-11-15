@@ -20,6 +20,10 @@ if args.count >= 3 && args[1] == "--readme-shots" {
     DemoShots.run(outDir: URL(fileURLWithPath: args[2]))
     exit(0)
 }
+// Teste: seleção múltipla do histórico
+if args.count >= 3 && args[1] == "--history-test" {
+    exit(DemoShots.historyTest(outDir: URL(fileURLWithPath: args[2])) ? 0 : 1)
+}
 // Teste: imagem anterior/seguinte no editor
 if args.count >= 3 && args[1] == "--nav-test" {
     exit(DemoShots.navTest(outDir: URL(fileURLWithPath: args[2])) ? 0 : 1)

@@ -213,7 +213,6 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
 /// logo depois de uma captura feita com um atalho global, sem ter de clicar nele primeiro.
 final class QuickPanel: NSPanel {
     override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
 }
 
 // ================= vistas =================
