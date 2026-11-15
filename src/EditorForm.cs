@@ -63,6 +63,8 @@ namespace SnapStudio
         Tool tool = Tool.Arrow;
         Color curColor = Color.FromArgb(229, 32, 41);
         float curWidth = 4, curFont = 26;
+        bool curRounded;                 // cantos arredondados nas novas caixas/setas/marcador/esbater
+        float curRadius = 12;
         static readonly Color HighlightColor = Color.FromArgb(255, 230, 0);
         static readonly Color SelectionColor = Color.FromArgb(99, 102, 241);
 
@@ -88,8 +90,9 @@ namespace SnapStudio
         readonly Dictionary<Tool, FlatButton> toolButtons = new Dictionary<Tool, FlatButton>();
         readonly List<FlatButton> swatches = new List<FlatButton>();
         FlatButton btnUndo, btnRedo, btnDelete, btnTheme, btnMoreColor;
-        Slider sldWidth, sldFont;
-        ThemedLabel lblFile, lblStatus, lblPath, lblZoom, lblSection, lblWidthVal, lblFontVal;
+        Slider sldWidth, sldFont, sldRadius;
+        ToggleRow tglRounded;
+        ThemedLabel lblFile, lblStatus, lblPath, lblZoom, lblSection, lblWidthVal, lblFontVal, lblRadiusVal;
         ListBox layers;
         readonly List<int> railSeps = new List<int>();
 
@@ -396,6 +399,19 @@ namespace SnapStudio
             sldFont = new Slider { Minimum = 12, Maximum = 80, Size = new Size(pw, Px(28)), Location = new Point(px, y + Px(22)), AccessibleName = S.T("Tamanho do texto", "Text size") };
             sldFont.ValueChanged += delegate { if (!syncing) SetFontSize(sldFont.Value); };
             props.Controls.Add(sldFont);
+            y += Px(62);
+
+            // cantos arredondados (caixas, setas, marcador, esbater, pixelizar)
+            tglRounded = new ToggleRow { Text = S.T("Cantos arredondados", "Rounded corners"), Font = Theme.Font(13 * dpi), Checked = curRounded, Size = new Size(pw, Px(34)), Location = new Point(px, y) };
+            tglRounded.CheckedChanged += delegate { if (!syncing) SetRounded(tglRounded.Checked); };
+            props.Controls.Add(tglRounded);
+            y += Px(40);
+            props.Controls.Add(new ThemedLabel { Text = S.T("Raio", "Radius"), Font = Theme.Font(13 * dpi), Location = new Point(px, y) });
+            lblRadiusVal = new ThemedLabel { Font = Theme.Font(13 * dpi), AutoSize = false, TextAlign = ContentAlignment.TopRight, Size = new Size(Px(80), Px(20)), Location = new Point(px + pw - Px(80), y) }.Muted();
+            props.Controls.Add(lblRadiusVal);
+            sldRadius = new Slider { Minimum = 2, Maximum = 40, Size = new Size(pw, Px(28)), Location = new Point(px, y + Px(22)), AccessibleName = S.T("Raio dos cantos", "Corner radius") };
+            sldRadius.ValueChanged += delegate { if (!syncing) SetRadius(sldRadius.Value); };
+            props.Controls.Add(sldRadius);
             y += Px(70);
             int divY = y;
             props.Paint += (s, e) => { using (var p = new Pen(Theme.Border)) e.Graphics.DrawLine(p, px, divY, px + pw, divY); };
@@ -965,6 +981,7 @@ namespace SnapStudio
                 default:
                     {
                         var sa = new ShapeAnn { Kind = KindFor(tool), X1 = p.X, Y1 = p.Y, X2 = p.X, Y2 = p.Y, Width = curWidth, Color = tool == Tool.Highlight ? HighlightColor : curColor };
+                        if (curRounded && sa.IsRoundable) sa.Radius = curRadius;
                         live = sa; drag = Drag.Create;
                         Dirty();
                     }
@@ -1066,6 +1083,9 @@ namespace SnapStudio
                             anns.Add(a);
                             selected = a;
                             MarkModified();
+                            // depois de colocar um elemento, volta ao ponteiro com ele selecionado;
+                            // o desenho livre mantém-se para traçar vários seguidos
+                            if (!(a is PenAnn)) SetTool(Tool.Select);
                         }
                         Dirty();
                     }
@@ -1208,6 +1228,8 @@ namespace SnapStudio
             editingText = null;
             Dirty();
             SelectionChanged();
+            // texto terminado: volta ao ponteiro (se vier de SetTool(x), o SetTool exterior define x a seguir)
+            if (tool == Tool.Text) SetTool(Tool.Select);
         }
 
         // ================= ferramentas e propriedades =================
@@ -1242,6 +1264,8 @@ namespace SnapStudio
             if (st.EditorColor != 0) curColor = Color.FromArgb(st.EditorColor);
             if (st.EditorWidth >= 1 && st.EditorWidth <= 16) curWidth = st.EditorWidth;
             if (st.EditorFont >= 12 && st.EditorFont <= 80) curFont = st.EditorFont;
+            curRounded = st.EditorRounded;
+            if (st.EditorRadius >= 2 && st.EditorRadius <= 40) curRadius = st.EditorRadius;
         }
 
         /// <summary>Memoriza a escolha (gravada no disco ao fechar o editor).</summary>
@@ -1249,9 +1273,10 @@ namespace SnapStudio
         {
             var st = TrayApp.Instance != null && !TrayApp.Instance.Headless ? TrayApp.Instance.Settings : null;
             if (st == null) return;
-            int c = curColor.ToArgb(), w = (int)curWidth, f = (int)curFont;
-            if (st.EditorColor == c && st.EditorWidth == w && st.EditorFont == f) return;
+            int c = curColor.ToArgb(), w = (int)curWidth, f = (int)curFont, rr = (int)curRadius;
+            if (st.EditorColor == c && st.EditorWidth == w && st.EditorFont == f && st.EditorRounded == curRounded && st.EditorRadius == rr) return;
             st.EditorColor = c; st.EditorWidth = w; st.EditorFont = f;
+            st.EditorRounded = curRounded; st.EditorRadius = rr;
             styleChanged = true;
         }
 
@@ -1330,8 +1355,45 @@ namespace SnapStudio
             {
                 sldWidth.SetSilently((int)curWidth); lblWidthVal.Text = (int)curWidth + " px";
                 sldFont.SetSilently((int)curFont); lblFontVal.Text = (int)curFont + " px";
+                if (tglRounded != null)
+                {
+                    tglRounded.Checked = curRounded;
+                    sldRadius.SetSilently((int)curRadius); lblRadiusVal.Text = (int)curRadius + " px";
+                    sldRadius.Enabled = curRounded;
+                }
             }
             finally { syncing = false; }
+        }
+
+        /// <summary>Liga/desliga os cantos arredondados (e aplica à anotação selecionada).</summary>
+        void SetRounded(bool on)
+        {
+            curRounded = on;
+            RememberStyle();
+            if (sldRadius != null) sldRadius.Enabled = on;
+            var sh = selected as ShapeAnn;
+            if (sh != null && anns.Contains(sh) && sh.IsRoundable && (sh.Radius > 0) != on)
+            {
+                PushUndo();
+                sh.Radius = on ? curRadius : 0;
+                MarkModified();
+                Dirty();
+            }
+        }
+
+        void SetRadius(float r)
+        {
+            curRadius = r;
+            RememberStyle();
+            if (lblRadiusVal != null) lblRadiusVal.Text = (int)r + " px";
+            var sh = selected as ShapeAnn;
+            if (curRounded && sh != null && anns.Contains(sh) && sh.IsRoundable && sh.Radius != r)
+            {
+                PushUndo();
+                sh.Radius = r;
+                MarkModified();
+                Dirty();
+            }
         }
 
         void SyncPropsFromSelection()
@@ -1341,6 +1403,12 @@ namespace SnapStudio
             UpdateSwatches();
             if (selected.UsesWidth) curWidth = selected.Width;
             if (selected.UsesFont) curFont = selected.FontSize;
+            var sh = selected as ShapeAnn;
+            if (sh != null && sh.IsRoundable)
+            {
+                curRounded = sh.Radius > 0;
+                if (sh.Radius > 0) curRadius = sh.Radius;
+            }
             SyncSliders();
         }
 

@@ -30,6 +30,8 @@ namespace SnapStudio
         [DataMember] public int EditorColor;          // última cor escolhida no editor (ARGB; 0 = omissão)
         [DataMember] public int EditorWidth;          // última espessura (px; 0 = omissão)
         [DataMember] public int EditorFont;           // último tamanho do texto (px; 0 = omissão)
+        [DataMember] public bool EditorRounded;       // cantos arredondados (caixas, setas, marcador, esbater)
+        [DataMember] public int EditorRadius;         // raio dos cantos (px)
         [DataMember] public bool AutoUpdateCheck;     // procurar versões novas no GitHub (uma vez por dia)
         [DataMember] public long LastUpdateCheck;     // DateTime.UtcNow.Ticks da última verificação
         [DataMember] public string SkippedVersion;    // "Ignorar esta versão"
@@ -56,6 +58,7 @@ namespace SnapStudio
             VideoFps = 30;
             VideoCursor = true;
             AutoUpdateCheck = true;
+            EditorRadius = 12;
             ThemeMode = "system";
             Accent = "indigo";
             AfterCapture = null; // definido em Load (migra o antigo OpenEditor)

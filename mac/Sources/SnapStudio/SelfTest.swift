@@ -82,6 +82,32 @@ enum SelfTest {
         let partial = try! JSONDecoder().decode(Settings.self, from: Data("{\"format\":\"jpg\"}".utf8))
         guard partial.format == "jpg", partial.videoFps == 30 else { print("FALHA: definições parciais"); return false }
 
+        // cantos arredondados: o canto exterior de uma caixa arredondada fica por pintar; o de uma caixa normal não
+        func cornerPixel(radius: CGFloat?) -> [UInt8]? {
+            let gw = 200, gh = 120
+            let gc = CGContext(data: nil, width: gw, height: gh, bitsPerComponent: 8, bytesPerRow: 0, space: cs,
+                               bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            gc.setFillColor(NSColor.white.cgColor); gc.fill(CGRect(x: 0, y: 0, width: gw, height: gh))
+            let bg = gc.makeImage()!
+            let box = Ann(kind: .rect, argb: ArgbColor.red)
+            box.p1 = CGPoint(x: 20, y: 20); box.p2 = CGPoint(x: 180, y: 100); box.width = 8; box.radius = radius
+            let arrow = Ann(kind: .arrow, argb: ArgbColor.red)
+            arrow.p1 = CGPoint(x: 40, y: 60); arrow.p2 = CGPoint(x: 160, y: 60); arrow.width = 6; arrow.radius = radius
+            guard let img = AnnRenderer().render(base: bg, anns: [box, arrow]) else { return nil }
+            if let r = radius, r > 0 { try? ImageUtil.save(img, to: outDir.appendingPathComponent("rounded.png")) }
+            return pixels(img, CGRect(x: 19, y: 19, width: 1, height: 1))
+        }
+        guard let sharp = cornerPixel(radius: nil), let round = cornerPixel(radius: 30),
+              sharp[1] < 100, round[1] > 200 else {
+            print("FALHA: cantos arredondados (normal=\(cornerPixel(radius: nil) ?? []), arredondado=\(cornerPixel(radius: 30) ?? []))"); return false
+        }
+        // anotações antigas (sem "radius") continuam a abrir
+        let oldJSON = Data("[{\"id\":\"\(UUID().uuidString)\",\"kind\":\"rect\",\"argb\":4293205033,\"width\":4,\"x1\":1,\"y1\":2,\"x2\":30,\"y2\":40,\"text\":\"\",\"size\":26,\"number\":0,\"pts\":[]}]".utf8)
+        let old = Ann.deserialize(oldJSON)
+        guard old.count == 1, old[0].cornerRadius == 0 else { print("FALHA: anotações antigas"); return false }
+        let rr = Ann(kind: .rect, argb: 0); rr.radius = 14
+        guard Ann.deserialize(Ann.serialize([rr])).first?.radius == 14 else { print("FALHA: raio na serialização"); return false }
+
         // comparação de versões (atualizações)
         let newer: [(String, String, Bool)] = [("1.2.0", "1.1.2", true), ("v1.1.10", "1.1.9", true), ("1.1.2", "1.1.2", false),
                                                ("1.1", "1.1.0", false), ("1.0.9", "1.1.0", false), ("2.0.0-beta", "1.9.9", true), ("V1.2", "1.1.9", true)]

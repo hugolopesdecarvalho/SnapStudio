@@ -188,6 +188,7 @@ final class CanvasView: NSView, NSTextViewDelegate, NSMenuItemValidation {
             let sa = Ann(kind: k, argb: model.tool == .highlight ? ArgbColor.highlight : model.color)
             sa.p1 = p; sa.p2 = p
             sa.width = model.width
+            if sa.isRoundable { sa.radius = model.newRadius }
             model.live = sa
             drag = .create
             needsDisplay = true
@@ -241,7 +242,12 @@ final class CanvasView: NSView, NSTextViewDelegate, NSMenuItemValidation {
                     let w = abs(a.x2 - a.x1) / scale * magnification, h = abs(a.y2 - a.y1) / scale * magnification
                     valid = a.isLinear ? (w + h) >= 6 : (w >= 4 && h >= 4)
                 }
-                if valid { model.add(a) }
+                if valid {
+                    model.add(a)
+                    // depois de colocar um elemento, volta ao ponteiro (com o elemento selecionado);
+                    // o desenho livre mantém-se para traçar vários seguidos
+                    if a.kind != .pen { model.setTool(.select) }
+                }
             }
         case .move, .handle1, .handle2:
             model.live = nil
@@ -458,6 +464,8 @@ final class CanvasView: NSView, NSTextViewDelegate, NSMenuItemValidation {
             model.add(t)
         }
         editingText = nil
+        // texto terminado: volta ao ponteiro (se commitText vier de setTool(x), o setTool exterior define x a seguir)
+        if model.tool == .text { model.setTool(.select) }
         model.changed()
     }
 }

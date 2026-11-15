@@ -86,8 +86,14 @@ final class Ann: Codable, Identifiable {
     var size: CGFloat = 26
     var number: Int = 0
     var pts: [CGFloat] = []
+    /// Raio dos cantos em pixels da imagem (nil/0 = cantos vivos). Opcional para abrir anotações antigas.
+    var radius: CGFloat?
 
     init(kind: AnnKind, argb: UInt32) { self.kind = kind; self.argb = argb }
+
+    var cornerRadius: CGFloat { max(0, radius ?? 0) }
+    /// Formas que aceitam cantos arredondados.
+    var isRoundable: Bool { [.rect, .highlight, .blur, .pixelate, .arrow].contains(kind) }
 
     var p1: CGPoint { get { CGPoint(x: x1, y: y1) } set { x1 = newValue.x; y1 = newValue.y } }
     var p2: CGPoint { get { CGPoint(x: x2, y: y2) } set { x2 = newValue.x; y2 = newValue.y } }
@@ -252,6 +258,13 @@ enum Geo {
         return dist(p, CGPoint(x: a.x + t * dx, y: a.y + t * dy))
     }
 
+    /// Retângulo com cantos arredondados (raio limitado a metade do lado menor; 0 = cantos vivos).
+    static func roundedRect(_ r: CGRect, _ radius: CGFloat) -> CGPath {
+        let rad = min(radius, r.width / 2, r.height / 2)
+        if rad < 0.5 || r.isNull || r.isEmpty { return CGPath(rect: r, transform: nil) }
+        return CGPath(roundedRect: r, cornerWidth: rad, cornerHeight: rad, transform: nil)
+    }
+
     static func norm(_ a: CGPoint, _ b: CGPoint) -> CGRect {
         CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(b.x - a.x), height: abs(b.y - a.y))
     }
@@ -355,10 +368,18 @@ final class AnnRenderer {
             g.setLineWidth(w); g.setLineCap(.round)
             let lineEnd = CGPoint(x: a.x2 - ux * effLen * 0.7, y: a.y2 - uy * effLen * 0.7)
             g.move(to: a.p1); g.addLine(to: lineEnd); g.strokePath()
-            g.move(to: a.p2)
-            g.addLine(to: CGPoint(x: baseP.x - uy * half, y: baseP.y + ux * half))
-            g.addLine(to: CGPoint(x: baseP.x + uy * half, y: baseP.y - ux * half))
-            g.closePath(); g.fillPath()
+            let headPath = CGMutablePath()
+            headPath.move(to: a.p2)
+            headPath.addLine(to: CGPoint(x: baseP.x - uy * half, y: baseP.y + ux * half))
+            headPath.addLine(to: CGPoint(x: baseP.x + uy * half, y: baseP.y - ux * half))
+            headPath.closeSubpath()
+            g.addPath(headPath); g.fillPath()
+            if a.cornerRadius > 0 {
+                // ponta arredondada: o triângulo é contornado com junções redondas
+                g.setLineJoin(.round)
+                g.setLineWidth(max(2, w * 0.9))
+                g.addPath(headPath); g.strokePath()
+            }
             g.restoreGState()
         case .line:
             g.saveGState()
@@ -368,7 +389,8 @@ final class AnnRenderer {
         case .rect:
             g.saveGState()
             g.setStrokeColor(col); g.setLineWidth(a.width); g.setLineJoin(.miter)
-            g.stroke(Geo.norm(a.p1, a.p2))
+            g.addPath(Geo.roundedRect(Geo.norm(a.p1, a.p2), a.cornerRadius))
+            g.strokePath()
             g.restoreGState()
         case .ellipse:
             g.saveGState()
@@ -378,10 +400,11 @@ final class AnnRenderer {
         case .highlight:
             g.saveGState()
             g.setFillColor(ArgbColor.ns(a.argb).withAlphaComponent(105 / 255).cgColor)
-            g.fill(Geo.norm(a.p1, a.p2))
+            g.addPath(Geo.roundedRect(Geo.norm(a.p1, a.p2), a.cornerRadius))
+            g.fillPath()
             g.restoreGState()
         case .blur, .pixelate:
-            obscure(g, base: base, rect: Geo.norm(a.p1, a.p2), pixelate: a.kind == .pixelate)
+            obscure(g, base: base, rect: Geo.norm(a.p1, a.p2), pixelate: a.kind == .pixelate, radius: a.cornerRadius)
         case .text:
             let path = Geo.textPath(a.text, size: a.size, at: a.p1)
             g.saveGState()
@@ -424,7 +447,7 @@ final class AnnRenderer {
     }
 
     /// Oculta uma zona: desfoque forte ou pixelização (Core Image), calculado sobre a imagem base.
-    func obscure(_ g: CGContext, base: CGImage, rect: CGRect, pixelate: Bool) {
+    func obscure(_ g: CGContext, base: CGImage, rect: CGRect, pixelate: Bool, radius: CGFloat = 0) {
         let W = CGFloat(base.width), H = CGFloat(base.height)
         let r = rect.integral.intersection(CGRect(x: 0, y: 0, width: W, height: H))
         if r.isNull || r.width < 2 || r.height < 2 { return }
@@ -454,7 +477,12 @@ final class AnnRenderer {
             if cache.count > 64 { cache.removeAll() }
             cache[key] = img
         }
-        if let i = img { g.drawUpright(i, in: r) }
+        if let i = img {
+            g.saveGState()
+            if radius > 0 { g.addPath(Geo.roundedRect(r, radius)); g.clip() }
+            g.drawUpright(i, in: r)
+            g.restoreGState()
+        }
     }
 
     /// Imagem final (base + anotações).

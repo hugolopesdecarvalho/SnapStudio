@@ -71,6 +71,8 @@ final class Settings: Codable {
     var editorColor: UInt32 = 0               // última cor no editor (ARGB; 0 = omissão)
     var editorWidth: Int = 0
     var editorFont: Int = 0
+    var editorRounded = false                 // cantos arredondados (caixas, setas, marcador, esbater)
+    var editorRadius: Int = 12                // raio em pixels da imagem
     var panelWidth: Int = 0                   // tamanho do painel da barra de menus (pontos; 0 = omissão)
     var panelHeight: Int = 0
     var autoUpdateCheck = true                // procurar versões novas no GitHub (uma vez por dia)
@@ -82,7 +84,7 @@ final class Settings: Codable {
     enum CodingKeys: String, CodingKey {
         case outputFolder, format, copyToClipboard, showNotification, afterCapture, themeMode, accent
         case hotkeyRegion, hotkeyWindow, hotkeyFull, hotkeyRecord, videoFps, videoCursor
-        case editorColor, editorWidth, editorFont, panelWidth, panelHeight
+        case editorColor, editorWidth, editorFont, editorRounded, editorRadius, panelWidth, panelHeight
         case autoUpdateCheck, lastUpdateCheck, skippedVersion
     }
 
@@ -108,6 +110,8 @@ final class Settings: Codable {
         editorColor = v(.editorColor, editorColor)
         editorWidth = v(.editorWidth, editorWidth)
         editorFont = v(.editorFont, editorFont)
+        editorRounded = v(.editorRounded, editorRounded)
+        editorRadius = v(.editorRadius, editorRadius)
         panelWidth = v(.panelWidth, panelWidth)
         panelHeight = v(.panelHeight, panelHeight)
         autoUpdateCheck = v(.autoUpdateCheck, autoUpdateCheck)

@@ -71,8 +71,23 @@ namespace SnapStudio
             return (c.R * 0.299 + c.G * 0.587 + c.B * 0.114) > 170 ? Color.FromArgb(40, 40, 40) : Color.White;
         }
 
-        /// <summary>Oculta uma zona: desfoque (reduz muito e amplia suavemente) ou pixelização.</summary>
-        public static void Obscure(Graphics g, Bitmap src, RectangleF rf, bool pixelate)
+        /// <summary>Retângulo com cantos arredondados (raio limitado a metade do lado menor; 0 = cantos vivos).</summary>
+        public static GraphicsPath RoundedPath(RectangleF r, float radius)
+        {
+            var p = new GraphicsPath();
+            float rad = Math.Min(radius, Math.Min(r.Width, r.Height) / 2f);
+            if (rad < 0.5f || r.Width <= 0 || r.Height <= 0) { p.AddRectangle(r); return p; }
+            float d = rad * 2;
+            p.AddArc(r.X, r.Y, d, d, 180, 90);
+            p.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+            p.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+            p.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+            p.CloseFigure();
+            return p;
+        }
+
+        /// <summary>Oculta uma zona: desfoque (reduz muito e amplia suavemente) ou pixelização. radius &gt; 0: zona com cantos arredondados.</summary>
+        public static void Obscure(Graphics g, Bitmap src, RectangleF rf, bool pixelate, float radius = 0)
         {
             Rectangle r = Rectangle.Round(rf);
             r.Intersect(new Rectangle(0, 0, src.Width, src.Height));
@@ -94,7 +109,8 @@ namespace SnapStudio
                     sg.DrawImage(src, new Rectangle(0, 0, gw, gh), grab, GraphicsUnit.Pixel);
                 }
                 var st = g.Save();
-                g.SetClip(r, CombineMode.Intersect);
+                if (radius > 0) { using (var rp = RoundedPath(r, radius)) g.SetClip(rp, CombineMode.Intersect); }
+                else g.SetClip(r, CombineMode.Intersect);
                 g.InterpolationMode = pixelate ? InterpolationMode.NearestNeighbor : InterpolationMode.HighQualityBicubic;
                 g.PixelOffsetMode = PixelOffsetMode.Half;
                 using (var ia = new ImageAttributes())
@@ -113,6 +129,10 @@ namespace SnapStudio
     {
         [DataMember] public string Kind;   // arrow line rect ellipse highlight blur pixelate
         [DataMember] public float X1, Y1, X2, Y2;
+        /// <summary>Raio dos cantos (0 = cantos vivos). Caixa, marcador, esbater, pixelizar; na seta, &gt; 0 arredonda a ponta.</summary>
+        [DataMember] public float Radius;
+
+        public bool IsRoundable { get { return Kind == "arrow" || Kind == "rect" || Kind == "highlight" || Kind == "blur" || Kind == "pixelate"; } }
 
         public PointF P1 { get { return new PointF(X1, Y1); } set { X1 = value.X; Y1 = value.Y; } }
         public PointF P2 { get { return new PointF(X2, Y2); } set { X2 = value.X; Y2 = value.Y; } }
@@ -137,6 +157,20 @@ namespace SnapStudio
             {
                 case "arrow":
                     if (Dist(P1, P2) < 1) return;
+                    if (Radius > 0)
+                    {
+                        // ponta arredondada: triângulo preenchido e contornado com junções redondas
+                        float hd = Math.Max(3.2f, 14f / Width), len = hd * Width, half = hd * 0.85f * Width / 2f;
+                        float dx = X2 - X1, dy = Y2 - Y1, d = (float)Math.Sqrt(dx * dx + dy * dy);
+                        float ux = dx / d, uy = dy / d, eff = Math.Min(len, d);
+                        var bp = new PointF(X2 - ux * eff, Y2 - uy * eff);
+                        var tri = new[] { new PointF(X2, Y2), new PointF(bp.X - uy * half, bp.Y + ux * half), new PointF(bp.X + uy * half, bp.Y - ux * half) };
+                        using (var pen = new Pen(Color, Width) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                            g.DrawLine(pen, X1, Y1, X2 - ux * eff * 0.7f, Y2 - uy * eff * 0.7f);
+                        using (var b = new SolidBrush(Color)) g.FillPolygon(b, tri);
+                        using (var pen = new Pen(Color, Math.Max(2f, Width * 0.9f)) { LineJoin = LineJoin.Round }) g.DrawPolygon(pen, tri);
+                        break;
+                    }
                     using (var pen = new Pen(Color, Width))
                     {
                         float head = Math.Max(3.2f, 14f / Width);
@@ -154,7 +188,10 @@ namespace SnapStudio
                     break;
                 case "rect":
                     using (var pen = new Pen(Color, Width) { LineJoin = LineJoin.Miter })
-                        g.DrawRectangle(pen, r.X, r.Y, r.Width, r.Height);
+                    {
+                        if (Radius > 0) using (var path = RoundedPath(r, Radius)) g.DrawPath(pen, path);
+                        else g.DrawRectangle(pen, r.X, r.Y, r.Width, r.Height);
+                    }
                     break;
                 case "ellipse":
                     using (var pen = new Pen(Color, Width))
@@ -162,13 +199,16 @@ namespace SnapStudio
                     break;
                 case "highlight":
                     using (var b = new SolidBrush(Color.FromArgb(105, Color)))
-                        g.FillRectangle(b, r);
+                    {
+                        if (Radius > 0) using (var path = RoundedPath(r, Radius)) g.FillPath(b, path);
+                        else g.FillRectangle(b, r);
+                    }
                     break;
                 case "blur":
-                    Obscure(g, baseImage, r, false);
+                    Obscure(g, baseImage, r, false, Radius);
                     break;
                 case "pixelate":
-                    Obscure(g, baseImage, r, true);
+                    Obscure(g, baseImage, r, true, Radius);
                     break;
             }
         }

@@ -7,6 +7,11 @@ final class EditorModel: ObservableObject {
     @Published var color: UInt32 = ArgbColor.red
     @Published var width: CGFloat = 4
     @Published var fontSize: CGFloat = 26
+    @Published var rounded = false            // cantos arredondados nas novas caixas/setas/marcador/esbater
+    @Published var radius: CGFloat = 12       // raio em pixels da imagem
+
+    /// Raio a usar numa anotação nova (0 = cantos vivos).
+    var newRadius: CGFloat? { rounded ? radius : nil }
     @Published private(set) var anns: [Ann] = []
     @Published var selectedID: UUID?
     @Published private(set) var modified = false
@@ -82,14 +87,36 @@ final class EditorModel: ObservableObject {
         if st.editorColor != 0 { color = st.editorColor }
         if (1...16).contains(st.editorWidth) { width = CGFloat(st.editorWidth) }
         if (12...80).contains(st.editorFont) { fontSize = CGFloat(st.editorFont) }
+        rounded = st.editorRounded
+        if (2...40).contains(st.editorRadius) { radius = CGFloat(st.editorRadius) }
     }
 
     func rememberStyle() {
         let st = AppController.shared.settings
-        let w = Int(width), f = Int(fontSize)
-        if st.editorColor == color && st.editorWidth == w && st.editorFont == f { return }
+        let w = Int(width), f = Int(fontSize), r = Int(radius)
+        if st.editorColor == color && st.editorWidth == w && st.editorFont == f && st.editorRounded == rounded && st.editorRadius == r { return }
         st.editorColor = color; st.editorWidth = w; st.editorFont = f
+        st.editorRounded = rounded; st.editorRadius = r
         st.save()
+    }
+
+    /// Liga/desliga os cantos arredondados (e aplica à anotação selecionada).
+    func setRounded(_ on: Bool) {
+        rounded = on
+        if let s = selected, s.isRoundable, (s.cornerRadius > 0) != on {
+            pushUndo()
+            s.radius = on ? radius : nil
+            markModified()
+        }
+    }
+
+    func setRadius(_ r: CGFloat) {
+        radius = r
+        if let s = selected, s.isRoundable, rounded, s.radius != r {
+            pushUndo()
+            s.radius = r
+            markModified()
+        }
     }
 
     func setTool(_ t: Tool) {
@@ -135,6 +162,10 @@ final class EditorModel: ObservableObject {
         color = s.argb
         if s.usesWidth { width = s.width }
         if s.usesFont { fontSize = s.size }
+        if s.isRoundable {
+            rounded = s.cornerRadius > 0
+            if s.cornerRadius > 0 { radius = s.cornerRadius }
+        }
     }
 
     // ---------- anotações ----------

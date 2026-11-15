@@ -326,6 +326,15 @@ struct FullEditorView: View {
                 HStack { Text(S.t("Tamanho do texto", "Text size")).font(.subheadline).foregroundStyle(.secondary); Spacer(); Text("\(Int(model.fontSize)) px").monospacedDigit() }
                 Slider(value: Binding(get: { model.fontSize }, set: { model.setFontSize($0.rounded()) }), in: 12...80)
             }
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle(S.t("Cantos arredondados", "Rounded corners"), isOn: Binding(get: { model.rounded }, set: { model.setRounded($0) }))
+                    .toggleStyle(.switch).controlSize(.small)
+                    .help(S.t("Caixas, setas, marcador, esbater e pixelizar", "Boxes, arrows, highlighter, blur and pixelate"))
+                HStack { Text(S.t("Raio", "Radius")).font(.subheadline).foregroundStyle(.secondary); Spacer(); Text("\(Int(model.radius)) px").monospacedDigit() }
+                    .opacity(model.rounded ? 1 : 0.45)
+                Slider(value: Binding(get: { model.radius }, set: { model.setRadius($0.rounded()) }), in: 2...40)
+                    .disabled(!model.rounded)
+            }
             Divider()
             Text(S.t("ANOTAÇÕES", "ANNOTATIONS")).font(.caption.bold()).foregroundStyle(.secondary)
             List(selection: Binding(get: { model.selectedID }, set: { id in
@@ -376,7 +385,7 @@ struct FullEditorView: View {
 struct QuickEditorView: View {
     @ObservedObject var model: EditorModel
     let controller: EditorWindowController
-    private let tools: [Tool] = [.arrow, .rect, .text, .blur, .step, .crop]
+    private let tools: [Tool] = [.select, .arrow, .rect, .text, .blur, .step, .crop]
 
     private var captureTitle: String {
         let attrs = try? FileManager.default.attributesOfItem(atPath: model.fileURL.path)

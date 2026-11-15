@@ -113,13 +113,14 @@ enum DemoShots {
     private static func annotateDashboard(_ m: EditorModel) {
         func a(_ k: AnnKind, _ c: UInt32, _ f: (Ann) -> Void) { let x = Ann(kind: k, argb: c); f(x); m.add(x) }
         let red = ArgbColor.red, blue = ArgbColor.rgb(37, 99, 235)
-        a(.blur, red) { $0.p1 = CGPoint(x: 1120, y: 22); $0.p2 = CGPoint(x: 1400, y: 70) }
-        a(.rect, red) { $0.p1 = CGPoint(x: 52, y: 120); $0.p2 = CGPoint(x: 388, y: 290); $0.width = 6 }
+        m.rounded = true; m.radius = 16      // mostra os cantos arredondados no painel de propriedades
+        a(.blur, red) { $0.p1 = CGPoint(x: 1120, y: 22); $0.p2 = CGPoint(x: 1400, y: 70); $0.radius = 12 }
+        a(.rect, red) { $0.p1 = CGPoint(x: 52, y: 120); $0.p2 = CGPoint(x: 388, y: 290); $0.width = 6; $0.radius = 16 }
         a(.step, red) { $0.p1 = CGPoint(x: 52, y: 120); $0.number = 1; $0.size = 30 }
-        a(.arrow, red) { $0.p1 = CGPoint(x: 700, y: 412); $0.p2 = CGPoint(x: 612, y: 452); $0.width = 7 }
+        a(.arrow, red) { $0.p1 = CGPoint(x: 700, y: 412); $0.p2 = CGPoint(x: 612, y: 452); $0.width = 7; $0.radius = 16 }
         a(.step, red) { $0.p1 = CGPoint(x: 676, y: 372); $0.number = 2; $0.size = 30 }
         a(.text, red) { $0.p1 = CGPoint(x: 704, y: 350); $0.text = "Peak in August"; $0.size = 36 }
-        a(.highlight, ArgbColor.highlight) { $0.p1 = CGPoint(x: 72, y: 336); $0.p2 = CGPoint(x: 360, y: 384) }
+        a(.highlight, ArgbColor.highlight) { $0.p1 = CGPoint(x: 72, y: 336); $0.p2 = CGPoint(x: 360, y: 384); $0.radius = 10 }
         a(.ellipse, blue) { $0.p1 = CGPoint(x: 1010, y: 160); $0.p2 = CGPoint(x: 1380, y: 270); $0.width = 6 }
         a(.step, blue) { $0.p1 = CGPoint(x: 1010, y: 160); $0.number = 3; $0.size = 30 }
         m.selectedID = nil
