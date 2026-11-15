@@ -302,8 +302,17 @@ struct FullEditorView: View {
     }
 
     private var props: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        let k = model.propKind
+        return VStack(alignment: .leading, spacing: 14) {
             Text(sectionTitle).font(.headline).lineLimit(1)
+            if k == nil {
+                Text(model.tool == .crop
+                     ? S.t("Arraste sobre a imagem para escolher a zona a manter.", "Drag over the image to choose the area to keep.")
+                     : S.t("Selecione uma anotação para a alterar, ou escolha uma ferramenta à esquerda.", "Select an annotation to change it, or pick a tool on the left."))
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if k?.usesColor == true {
             VStack(alignment: .leading, spacing: 8) {
                 Text(S.t("Cor", "Color")).font(.subheadline).foregroundStyle(.secondary)
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(30), spacing: 10), count: 5), alignment: .leading, spacing: 10) {
@@ -318,22 +327,49 @@ struct FullEditorView: View {
                         .help(S.t("Outra cor…", "More colors…"))
                 }
             }
-            VStack(alignment: .leading, spacing: 4) {
-                HStack { Text(S.t("Espessura", "Width")).font(.subheadline).foregroundStyle(.secondary); Spacer(); Text("\(Int(model.width)) px").monospacedDigit() }
-                Slider(value: Binding(get: { model.width }, set: { model.setWidth($0.rounded()) }), in: 1...16)
             }
-            VStack(alignment: .leading, spacing: 4) {
-                HStack { Text(S.t("Tamanho do texto", "Text size")).font(.subheadline).foregroundStyle(.secondary); Spacer(); Text("\(Int(model.fontSize)) px").monospacedDigit() }
-                Slider(value: Binding(get: { model.fontSize }, set: { model.setFontSize($0.rounded()) }), in: 12...80)
+            if k?.usesWidth == true {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack { Text(S.t("Espessura", "Width")).font(.subheadline).foregroundStyle(.secondary); Spacer(); Text("\(Int(model.width)) px").monospacedDigit() }
+                    Slider(value: Binding(get: { model.width }, set: { model.setWidth($0.rounded()) }), in: 1...16)
+                }
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Toggle(S.t("Cantos arredondados", "Rounded corners"), isOn: Binding(get: { model.rounded }, set: { model.setRounded($0) }))
-                    .toggleStyle(.switch).controlSize(.small)
-                    .help(S.t("Caixas, setas, marcador, esbater e pixelizar", "Boxes, arrows, highlighter, blur and pixelate"))
-                HStack { Text(S.t("Raio", "Radius")).font(.subheadline).foregroundStyle(.secondary); Spacer(); Text("\(Int(model.radius)) px").monospacedDigit() }
-                    .opacity(model.rounded ? 1 : 0.45)
-                Slider(value: Binding(get: { model.radius }, set: { model.setRadius($0.rounded()) }), in: 2...40)
-                    .disabled(!model.rounded)
+            if k?.usesFont == true {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack { Text(S.t("Tamanho do texto", "Text size")).font(.subheadline).foregroundStyle(.secondary); Spacer(); Text("\(Int(model.fontSize)) px").monospacedDigit() }
+                    Slider(value: Binding(get: { model.fontSize }, set: { model.setFontSize($0.rounded()) }), in: 12...80)
+                }
+            }
+            if k?.usesOutline == true {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(S.t("Contorno", "Outline")).font(.subheadline).foregroundStyle(.secondary)
+                    Picker("", selection: Binding(get: { model.textOutline }, set: { model.setTextOutline($0) })) {
+                        ForEach(TextOutline.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
+            }
+            if k?.usesFill == true {
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle(S.t("Preencher", "Fill"), isOn: Binding(get: { model.fillOn }, set: { model.setFill($0) }))
+                        .toggleStyle(.switch).controlSize(.small)
+                    if model.fillOn {
+                        HStack { Text(S.t("Opacidade", "Opacity")).font(.subheadline).foregroundStyle(.secondary); Spacer(); Text("\(Int((model.fillOpacity * 100).rounded()))%").monospacedDigit() }
+                        Slider(value: Binding(get: { model.fillOpacity * 100 }, set: { model.setFillOpacity(($0 / 5).rounded() * 5 / 100) }), in: 10...100)
+                    }
+                }
+            }
+            if k?.usesRounded == true {
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle(k == .arrow ? S.t("Ponta arredondada", "Rounded tip") : S.t("Cantos arredondados", "Rounded corners"),
+                           isOn: Binding(get: { model.rounded }, set: { model.setRounded($0) }))
+                        .toggleStyle(.switch).controlSize(.small)
+                    if k?.usesRadius == true && model.rounded {
+                        HStack { Text(S.t("Raio", "Radius")).font(.subheadline).foregroundStyle(.secondary); Spacer(); Text("\(Int(model.radius)) px").monospacedDigit() }
+                        Slider(value: Binding(get: { model.radius }, set: { model.setRadius($0.rounded()) }), in: 2...40)
+                    }
+                }
             }
             Divider()
             Text(S.t("ANOTAÇÕES", "ANNOTATIONS")).font(.caption.bold()).foregroundStyle(.secondary)

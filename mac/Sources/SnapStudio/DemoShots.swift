@@ -89,6 +89,38 @@ enum DemoShots {
         print("OK -> \(outDir.path)")
     }
 
+    /// `--props-shots <pasta>`: fotografa o painel de propriedades do editor com várias ferramentas/seleções.
+    static func propsShots(outDir: URL) {
+        NSApplication.shared.setActivationPolicy(.accessory)
+        let fm = FileManager.default
+        try? fm.createDirectory(at: outDir, withIntermediateDirectories: true)
+        let img = fm.temporaryDirectory.appendingPathComponent("SnapStudioProps-\(getpid()).png")
+        try? ImageUtil.save(DemoArt.dashboard(), to: img)
+        defer { try? fm.removeItem(at: img); Sidecar.delete(img) }
+        func pump(_ s: Double) { RunLoop.main.run(until: Date().addingTimeInterval(s)) }
+        guard let m = try? EditorModel(url: img, initial: nil, compact: false) else { return }
+        let hl = Ann(kind: .highlight, argb: ArgbColor.highlight); hl.p1 = CGPoint(x: 72, y: 336); hl.p2 = CGPoint(x: 360, y: 384); hl.radius = 10
+        m.add(hl)
+        let wc = EditorWindowController(model: m)
+        wc.window?.setContentSize(CGSize(width: 1180, height: 760))
+        wc.window?.center()
+        wc.window?.orderFrontRegardless()
+        pump(1.5)
+        let cases: [(String, Tool, Bool)] = [("select-none", .select, false), ("select-highlight", .select, true), ("text", .text, false),
+                                             ("rect", .rect, false), ("arrow", .arrow, false), ("blur", .blur, false), ("step", .step, false), ("crop", .crop, false)]
+        for (name, t, sel) in cases {
+            m.setTool(t)
+            m.selectedID = sel ? hl.id : nil
+            if sel { m.syncPropsFromSelection() }
+            m.rounded = (t == .rect || sel)
+            m.fillOn = (t == .rect)
+            m.changed()
+            pump(0.8)
+            shoot(wc.window!, outDir.appendingPathComponent("props-\(name).png"))
+        }
+        wc.window?.orderOut(nil)
+    }
+
     /// `--settings-shots <pasta> [light|dark]`: fotografa a janela das Definições em cada secção.
     static func settingsShots(outDir: URL, theme: String) {
         NSApplication.shared.setActivationPolicy(.accessory)

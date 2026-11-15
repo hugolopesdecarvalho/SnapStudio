@@ -110,7 +110,12 @@ Tool keys (same on both platforms): Select (V), Arrow (A), Box (R), Text (T), **
 
 Hold Shift while drawing for 45° angles and squares. Use the **Drag** button to drop the image straight into another app.
 
-After you place an annotation, the editor switches back to **Select** with it selected, so you can move or adjust it right away (numbered steps and freehand stay active to place several in a row). Turn on **Rounded corners** in the full editor's properties, with an adjustable radius, for boxes, arrows, the highlighter, blur and pixelate; the choice is remembered like color and width.
+After you place an annotation, the editor switches back to **Select** with it selected, so you can move or adjust it right away (numbered steps and freehand stay active to place several in a row). The full editor's properties panel only shows what applies to the selected annotation (or to the active tool):
+- **Rounded corners** with an adjustable radius for boxes, the highlighter, blur and pixelate, and a rounded tip for arrows.
+- **Fill** with an adjustable opacity for boxes and ellipses.
+- **Outline** for text: automatic, white, black or none.
+
+Every choice is remembered like color and width.
 
 ### Screen recording
 Start a recording with the shortcut or the *Record screen video* button, then choose a window, a region or the full screen. Recording starts after a 3-second countdown. A red frame marks the area and a floating bar shows the time, with **Pause**, **Stop** and **Cancel**. Press the shortcut again to stop. The MP4 is saved next to your captures and copied to the clipboard as a file.

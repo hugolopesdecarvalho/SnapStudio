@@ -9,6 +9,15 @@ final class EditorModel: ObservableObject {
     @Published var fontSize: CGFloat = 26
     @Published var rounded = false            // cantos arredondados nas novas caixas/setas/marcador/esbater
     @Published var radius: CGFloat = 12       // raio em pixels da imagem
+    @Published var fillOn = false             // preencher caixas e elipses
+    @Published var fillOpacity: CGFloat = 0.25
+    @Published var textOutline: TextOutline = .auto
+
+    /// Preenchimento a usar numa caixa/elipse nova (nil = só a borda).
+    var newFill: CGFloat? { fillOn ? fillOpacity : nil }
+
+    /// Tipo cujas propriedades o painel mostra: o da anotação selecionada ou o que a ferramenta ativa cria.
+    var propKind: AnnKind? { selected?.kind ?? tool.annKind }
 
     /// Raio a usar numa anotação nova (0 = cantos vivos).
     var newRadius: CGFloat? { rounded ? radius : nil }
@@ -89,15 +98,48 @@ final class EditorModel: ObservableObject {
         if (12...80).contains(st.editorFont) { fontSize = CGFloat(st.editorFont) }
         rounded = st.editorRounded
         if (2...40).contains(st.editorRadius) { radius = CGFloat(st.editorRadius) }
+        fillOn = st.editorFill
+        if (10...100).contains(st.editorFillOpacity) { fillOpacity = CGFloat(st.editorFillOpacity) / 100 }
+        textOutline = TextOutline(rawValue: st.editorTextOutline) ?? .auto
     }
 
     func rememberStyle() {
         let st = AppController.shared.settings
-        let w = Int(width), f = Int(fontSize), r = Int(radius)
-        if st.editorColor == color && st.editorWidth == w && st.editorFont == f && st.editorRounded == rounded && st.editorRadius == r { return }
+        let w = Int(width), f = Int(fontSize), r = Int(radius), fo = Int((fillOpacity * 100).rounded())
+        if st.editorColor == color && st.editorWidth == w && st.editorFont == f && st.editorRounded == rounded && st.editorRadius == r
+            && st.editorFill == fillOn && st.editorFillOpacity == fo && st.editorTextOutline == textOutline.rawValue { return }
         st.editorColor = color; st.editorWidth = w; st.editorFont = f
         st.editorRounded = rounded; st.editorRadius = r
+        st.editorFill = fillOn; st.editorFillOpacity = fo; st.editorTextOutline = textOutline.rawValue
         st.save()
+    }
+
+    /// Liga/desliga o preenchimento (e aplica à caixa/elipse selecionada).
+    func setFill(_ on: Bool) {
+        fillOn = on
+        if let s = selected, s.kind.usesFill, (s.fillOpacity > 0) != on {
+            pushUndo()
+            s.fill = on ? fillOpacity : nil
+            markModified()
+        }
+    }
+
+    func setFillOpacity(_ o: CGFloat) {
+        fillOpacity = max(0.1, min(1, o))
+        if let s = selected, s.kind.usesFill, fillOn, s.fill != fillOpacity {
+            pushUndo()
+            s.fill = fillOpacity
+            markModified()
+        }
+    }
+
+    func setTextOutline(_ o: TextOutline) {
+        textOutline = o
+        if let s = selected, s.kind.usesOutline, s.textOutline != o {
+            pushUndo()
+            s.outline = o.rawValue
+            markModified()
+        }
     }
 
     /// Liga/desliga os cantos arredondados (e aplica à anotação selecionada).
@@ -166,6 +208,11 @@ final class EditorModel: ObservableObject {
             rounded = s.cornerRadius > 0
             if s.cornerRadius > 0 { radius = s.cornerRadius }
         }
+        if s.kind.usesFill {
+            fillOn = s.fillOpacity > 0
+            if s.fillOpacity > 0 { fillOpacity = s.fillOpacity }
+        }
+        if s.kind.usesOutline { textOutline = s.textOutline }
     }
 
     // ---------- anotações ----------

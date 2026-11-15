@@ -20,6 +20,11 @@ if args.count >= 3 && args[1] == "--readme-shots" {
     DemoShots.run(outDir: URL(fileURLWithPath: args[2]))
     exit(0)
 }
+// Teste: fotografa o painel de propriedades do editor em vários casos
+if args.count >= 3 && args[1] == "--props-shots" {
+    DemoShots.propsShots(outDir: URL(fileURLWithPath: args[2]))
+    exit(0)
+}
 // Teste: fotografa a janela das Definições em cada secção
 if args.count >= 3 && args[1] == "--settings-shots" {
     DemoShots.settingsShots(outDir: URL(fileURLWithPath: args[2]), theme: args.count > 3 ? args[3] : "light")

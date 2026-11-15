@@ -65,6 +65,26 @@ namespace SnapStudio
         float curWidth = 4, curFont = 26;
         bool curRounded;                 // cantos arredondados nas novas caixas/setas/marcador/esbater
         float curRadius = 12;
+        bool curFillOn;                  // preencher caixas e elipses
+        float curFill = 0.25f;           // opacidade do preenchimento
+        int curOutline;                  // contorno do texto: 0 auto, 1 branco, 2 preto, 3 nenhum
+
+        /// <summary>Grupo de controlos do painel de propriedades (posições relativas ao topo do grupo).</summary>
+        class PropGroup
+        {
+            public string Key;
+            public int Height;
+            public readonly List<Control> Items = new List<Control>();
+            public readonly List<int> Dy = new List<int>();
+            public void Add(Control c, int dy) { Items.Add(c); Dy.Add(dy); }
+        }
+        readonly List<PropGroup> propGroups = new List<PropGroup>();
+        readonly List<FlatButton> outlineButtons = new List<FlatButton>();
+        ThemedPanel propsPanel;
+        ThemedLabel lblPropsHint, lblLayersTitle, lblFillVal;
+        ToggleRow tglFill;
+        Slider sldFill;
+        int propsDivY;
         static readonly Color HighlightColor = Color.FromArgb(255, 230, 0);
         static readonly Color SelectionColor = Color.FromArgb(99, 102, 241);
 
@@ -372,52 +392,92 @@ namespace SnapStudio
             int px = Px(16), pw = Px(272) - 2 * Px(16);
             lblSection = new ThemedLabel { Font = Theme.Font(12 * dpi, FontStyle.Bold), Location = new Point(px, Px(18)) }.Muted();
             props.Controls.Add(lblSection);
-            props.Controls.Add(new ThemedLabel { Text = S.T("Cor", "Color"), Font = Theme.Font(13 * dpi), Location = new Point(px, Px(48)) });
+            // As propriedades estão em grupos; LayoutProps mostra só os que têm efeito no elemento
+            // selecionado (ou no que a ferramenta ativa cria) e empilha-os. Posições relativas ao grupo.
+            propsPanel = props;
+            lblPropsHint = new ThemedLabel { Font = Theme.Font(12.5f * dpi), AutoSize = false, Size = new Size(pw, Px(52)), Location = new Point(px, Px(48)) }.Muted();
+            props.Controls.Add(lblPropsHint);
+
+            // Cor
+            var gColor = NewGroup("color");
+            gColor.Add(PropLabel(props, S.T("Cor", "Color"), px), 0);
             int cell = (pw - 5 * Px(8)) / 6;
-            int sy0 = Px(72);
             for (int i = 0; i < FullPalette.Length; i++)
             {
                 var b = SwatchButton(props, FullPalette[i], cell, false);
-                b.Location = new Point(px + (i % 6) * (cell + Px(8)), sy0 + (i / 6) * (cell + Px(8)));
+                b.Left = px + (i % 6) * (cell + Px(8));
+                gColor.Add(b, Px(24) + (i / 6) * (cell + Px(8)));
             }
             btnMoreColor = Btn(props, BtnKind.Secondary, "plus", null, S.T("Outra cor…", "More colors…"), delegate { PickColor(); });
             btnMoreColor.Size = new Size(cell, cell);
-            btnMoreColor.Location = new Point(px + 2 * (cell + Px(8)), sy0 + cell + Px(8));
-            y = sy0 + 2 * cell + Px(8) + Px(20);
+            btnMoreColor.Left = px + 2 * (cell + Px(8));
+            gColor.Add(btnMoreColor, Px(24) + cell + Px(8));
+            gColor.Height = Px(24) + 2 * cell + Px(8) + Px(20);
 
-            props.Controls.Add(new ThemedLabel { Text = S.T("Espessura", "Width"), Font = Theme.Font(13 * dpi), Location = new Point(px, y) });
-            lblWidthVal = new ThemedLabel { Font = Theme.Font(13 * dpi), AutoSize = false, TextAlign = ContentAlignment.TopRight, Size = new Size(Px(80), Px(20)), Location = new Point(px + pw - Px(80), y) }.Muted();
-            props.Controls.Add(lblWidthVal);
-            sldWidth = new Slider { Minimum = 1, Maximum = 16, Size = new Size(pw, Px(28)), Location = new Point(px, y + Px(22)), AccessibleName = S.T("Espessura", "Width") };
+            // Espessura
+            var gWidth = NewGroup("width");
+            gWidth.Add(PropLabel(props, S.T("Espessura", "Width"), px), 0);
+            lblWidthVal = ValueLabel(props, px, pw); gWidth.Add(lblWidthVal, 0);
+            sldWidth = new Slider { Minimum = 1, Maximum = 16, Size = new Size(pw, Px(28)), Left = px, AccessibleName = S.T("Espessura", "Width") };
             sldWidth.ValueChanged += delegate { if (!syncing) SetWidth(sldWidth.Value); };
-            props.Controls.Add(sldWidth);
-            y += Px(64);
+            props.Controls.Add(sldWidth); gWidth.Add(sldWidth, Px(22));
+            gWidth.Height = Px(64);
 
-            props.Controls.Add(new ThemedLabel { Text = S.T("Tamanho do texto", "Text size"), Font = Theme.Font(13 * dpi), Location = new Point(px, y) });
-            lblFontVal = new ThemedLabel { Font = Theme.Font(13 * dpi), AutoSize = false, TextAlign = ContentAlignment.TopRight, Size = new Size(Px(80), Px(20)), Location = new Point(px + pw - Px(80), y) }.Muted();
-            props.Controls.Add(lblFontVal);
-            sldFont = new Slider { Minimum = 12, Maximum = 80, Size = new Size(pw, Px(28)), Location = new Point(px, y + Px(22)), AccessibleName = S.T("Tamanho do texto", "Text size") };
+            // Tamanho do texto
+            var gFont = NewGroup("font");
+            gFont.Add(PropLabel(props, S.T("Tamanho do texto", "Text size"), px), 0);
+            lblFontVal = ValueLabel(props, px, pw); gFont.Add(lblFontVal, 0);
+            sldFont = new Slider { Minimum = 12, Maximum = 80, Size = new Size(pw, Px(28)), Left = px, AccessibleName = S.T("Tamanho do texto", "Text size") };
             sldFont.ValueChanged += delegate { if (!syncing) SetFontSize(sldFont.Value); };
-            props.Controls.Add(sldFont);
-            y += Px(62);
+            props.Controls.Add(sldFont); gFont.Add(sldFont, Px(22));
+            gFont.Height = Px(64);
 
-            // cantos arredondados (caixas, setas, marcador, esbater, pixelizar)
-            tglRounded = new ToggleRow { Text = S.T("Cantos arredondados", "Rounded corners"), Font = Theme.Font(13 * dpi), Checked = curRounded, Size = new Size(pw, Px(34)), Location = new Point(px, y) };
+            // Contorno do texto: automático / branco / preto / nenhum
+            var gOutline = NewGroup("outline");
+            gOutline.Add(PropLabel(props, S.T("Contorno", "Outline"), px), 0);
+            string[] outlineNames = { S.T("Auto", "Auto"), S.T("Branco", "White"), S.T("Preto", "Black"), S.T("Nenhum", "None") };
+            int ow = (pw - 3 * Px(4)) / 4;
+            for (int i = 0; i < 4; i++)
+            {
+                int value = i;
+                var ob = new FlatButton { Kind = BtnKind.Secondary, Text = outlineNames[i], Font = Theme.Font(12 * dpi), Radius = 6, Size = new Size(ow, Px(30)), Left = px + i * (ow + Px(4)), Tag = i };
+                ob.Click += delegate { SetTextOutline(value); };
+                props.Controls.Add(ob); outlineButtons.Add(ob); gOutline.Add(ob, Px(24));
+            }
+            gOutline.Height = Px(66);
+
+            // Preencher (caixas e elipses)
+            var gFill = NewGroup("fill");
+            tglFill = new ToggleRow { Text = S.T("Preencher", "Fill"), Font = Theme.Font(13 * dpi), Checked = curFillOn, Size = new Size(pw, Px(34)), Left = px };
+            tglFill.CheckedChanged += delegate { if (!syncing) SetFill(tglFill.Checked); };
+            props.Controls.Add(tglFill); gFill.Add(tglFill, 0);
+            gFill.Height = Px(40);
+            var gFillOpacity = NewGroup("fillOpacity");
+            gFillOpacity.Add(PropLabel(props, S.T("Opacidade", "Opacity"), px), 0);
+            lblFillVal = ValueLabel(props, px, pw); gFillOpacity.Add(lblFillVal, 0);
+            sldFill = new Slider { Minimum = 10, Maximum = 100, Size = new Size(pw, Px(28)), Left = px, AccessibleName = S.T("Opacidade do preenchimento", "Fill opacity") };
+            sldFill.ValueChanged += delegate { if (!syncing) SetFillOpacity(sldFill.Value / 100f); };
+            props.Controls.Add(sldFill); gFillOpacity.Add(sldFill, Px(22));
+            gFillOpacity.Height = Px(64);
+
+            // Cantos arredondados (caixas, setas, marcador, esbater, pixelizar)
+            var gRounded = NewGroup("rounded");
+            tglRounded = new ToggleRow { Text = S.T("Cantos arredondados", "Rounded corners"), Font = Theme.Font(13 * dpi), Checked = curRounded, Size = new Size(pw, Px(34)), Left = px };
             tglRounded.CheckedChanged += delegate { if (!syncing) SetRounded(tglRounded.Checked); };
-            props.Controls.Add(tglRounded);
-            y += Px(40);
-            props.Controls.Add(new ThemedLabel { Text = S.T("Raio", "Radius"), Font = Theme.Font(13 * dpi), Location = new Point(px, y) });
-            lblRadiusVal = new ThemedLabel { Font = Theme.Font(13 * dpi), AutoSize = false, TextAlign = ContentAlignment.TopRight, Size = new Size(Px(80), Px(20)), Location = new Point(px + pw - Px(80), y) }.Muted();
-            props.Controls.Add(lblRadiusVal);
-            sldRadius = new Slider { Minimum = 2, Maximum = 40, Size = new Size(pw, Px(28)), Location = new Point(px, y + Px(22)), AccessibleName = S.T("Raio dos cantos", "Corner radius") };
+            props.Controls.Add(tglRounded); gRounded.Add(tglRounded, 0);
+            gRounded.Height = Px(40);
+            var gRadius = NewGroup("radius");
+            gRadius.Add(PropLabel(props, S.T("Raio", "Radius"), px), 0);
+            lblRadiusVal = ValueLabel(props, px, pw); gRadius.Add(lblRadiusVal, 0);
+            sldRadius = new Slider { Minimum = 2, Maximum = 40, Size = new Size(pw, Px(28)), Left = px, AccessibleName = S.T("Raio dos cantos", "Corner radius") };
             sldRadius.ValueChanged += delegate { if (!syncing) SetRadius(sldRadius.Value); };
-            props.Controls.Add(sldRadius);
-            y += Px(70);
-            int divY = y;
-            props.Paint += (s, e) => { using (var p = new Pen(Theme.Border)) e.Graphics.DrawLine(p, px, divY, px + pw, divY); };
-            y += Px(16);
-            props.Controls.Add(new ThemedLabel { Text = S.T("ANOTAÇÕES", "ANNOTATIONS"), Font = Theme.Font(12 * dpi, FontStyle.Bold), Location = new Point(px, y) }.Muted());
-            y += Px(26);
+            props.Controls.Add(sldRadius); gRadius.Add(sldRadius, Px(22));
+            gRadius.Height = Px(64);
+
+            props.Paint += (s, e) => { using (var p = new Pen(Theme.Border)) e.Graphics.DrawLine(p, px, propsDivY, px + pw, propsDivY); };
+            lblLayersTitle = new ThemedLabel { Text = S.T("ANOTAÇÕES", "ANNOTATIONS"), Font = Theme.Font(12 * dpi, FontStyle.Bold), Location = new Point(px, Px(300)) }.Muted();
+            props.Controls.Add(lblLayersTitle);
+            y = Px(326);
             layers = new ListBox
             {
                 DrawMode = DrawMode.OwnerDrawFixed,
@@ -634,7 +694,102 @@ namespace SnapStudio
             UpdateUndoButtons();
             UpdateSection();
             SyncLayerSelection();
+            LayoutProps();
             canvas.Invalidate();
+        }
+
+        // ================= painel de propriedades contextual =================
+
+        PropGroup NewGroup(string key) { var g = new PropGroup { Key = key }; propGroups.Add(g); return g; }
+
+        ThemedLabel PropLabel(Control parent, string text, int x)
+        {
+            var l = new ThemedLabel { Text = text, Font = Theme.Font(13 * dpi), Left = x };
+            parent.Controls.Add(l);
+            return l;
+        }
+
+        ThemedLabel ValueLabel(Control parent, int x, int w)
+        {
+            var l = new ThemedLabel { Font = Theme.Font(13 * dpi), AutoSize = false, TextAlign = ContentAlignment.TopRight, Size = new Size(Px(80), Px(20)), Left = x + w - Px(80) }.Muted();
+            parent.Controls.Add(l);
+            return l;
+        }
+
+        /// <summary>Tipo cujas propriedades o painel mostra: o da anotação selecionada ou o que a ferramenta cria (null: nenhum).</summary>
+        string PropKind()
+        {
+            if (selected != null && anns.Contains(selected))
+            {
+                var sh = selected as ShapeAnn;
+                if (sh != null) return sh.Kind;
+                if (selected is TextAnn) return "text";
+                if (selected is StepAnn) return "step";
+                if (selected is PenAnn) return "pen";
+            }
+            switch (tool)
+            {
+                case Tool.Select: case Tool.Crop: return null;
+                case Tool.Text: return "text";
+                case Tool.Step: return "step";
+                case Tool.Pen: return "pen";
+                default: return KindFor(tool);
+            }
+        }
+
+        bool GroupVisible(string key, string k)
+        {
+            if (k == null) return false;
+            switch (key)
+            {
+                case "color": return k != "blur" && k != "pixelate";
+                case "width": return k == "arrow" || k == "line" || k == "rect" || k == "ellipse" || k == "pen";
+                case "font": return k == "text" || k == "step";
+                case "outline": return k == "text";
+                case "fill": return k == "rect" || k == "ellipse";
+                case "fillOpacity": return (k == "rect" || k == "ellipse") && curFillOn;
+                case "rounded": return k == "arrow" || k == "rect" || k == "highlight" || k == "blur" || k == "pixelate";
+                case "radius": return (k == "rect" || k == "highlight" || k == "blur" || k == "pixelate") && curRounded;
+            }
+            return false;
+        }
+
+        /// <summary>Mostra só as propriedades que têm efeito e empilha-as; a lista de anotações fica por baixo.</summary>
+        void LayoutProps()
+        {
+            if (propsPanel == null) return;
+            string k = PropKind();
+            int y = Px(48);
+            lblPropsHint.Visible = k == null;
+            if (k == null)
+            {
+                lblPropsHint.Text = tool == Tool.Crop
+                    ? S.T("Arraste sobre a imagem para escolher a zona a manter.", "Drag over the image to choose the area to keep.")
+                    : S.T("Selecione uma anotação para a alterar, ou escolha uma ferramenta à esquerda.", "Select an annotation to change it, or pick a tool on the left.");
+                lblPropsHint.Top = y;
+                y += Px(60);
+            }
+            propsPanel.SuspendLayout();
+            foreach (var g in propGroups)
+            {
+                bool vis = GroupVisible(g.Key, k);
+                for (int i = 0; i < g.Items.Count; i++)
+                {
+                    g.Items[i].Visible = vis;
+                    if (vis) g.Items[i].Top = y + g.Dy[i];
+                }
+                if (vis) y += g.Height;
+            }
+            tglRounded.Text = k == "arrow" ? S.T("Ponta arredondada", "Rounded tip") : S.T("Cantos arredondados", "Rounded corners");
+            tglRounded.Invalidate();
+            propsDivY = y + Px(2);
+            y += Px(18);
+            lblLayersTitle.Top = y;
+            y += Px(26);
+            layers.Top = y;
+            layers.Height = Math.Max(Px(60), propsPanel.Height - y - Px(12));
+            propsPanel.ResumeLayout(true);
+            propsPanel.Invalidate();
         }
 
         void MarkModified()
@@ -982,6 +1137,7 @@ namespace SnapStudio
                     {
                         var sa = new ShapeAnn { Kind = KindFor(tool), X1 = p.X, Y1 = p.Y, X2 = p.X, Y2 = p.Y, Width = curWidth, Color = tool == Tool.Highlight ? HighlightColor : curColor };
                         if (curRounded && sa.IsRoundable) sa.Radius = curRadius;
+                        if (curFillOn && (sa.Kind == "rect" || sa.Kind == "ellipse")) sa.Fill = curFill;
                         live = sa; drag = Drag.Create;
                         Dirty();
                     }
@@ -1220,7 +1376,7 @@ namespace SnapStudio
             else if (txt.Length > 0)
             {
                 PushUndo();
-                var t = new TextAnn { X = textPos.X, Y = textPos.Y, Text = txt, Size = textSize, Color = textColor };
+                var t = new TextAnn { X = textPos.X, Y = textPos.Y, Text = txt, Size = textSize, Color = textColor, Outline = curOutline };
                 anns.Add(t);
                 selected = t;
                 MarkModified();
@@ -1266,6 +1422,9 @@ namespace SnapStudio
             if (st.EditorFont >= 12 && st.EditorFont <= 80) curFont = st.EditorFont;
             curRounded = st.EditorRounded;
             if (st.EditorRadius >= 2 && st.EditorRadius <= 40) curRadius = st.EditorRadius;
+            curFillOn = st.EditorFill;
+            if (st.EditorFillOpacity >= 10 && st.EditorFillOpacity <= 100) curFill = st.EditorFillOpacity / 100f;
+            if (st.EditorTextOutline >= 0 && st.EditorTextOutline <= 3) curOutline = st.EditorTextOutline;
         }
 
         /// <summary>Memoriza a escolha (gravada no disco ao fechar o editor).</summary>
@@ -1273,10 +1432,12 @@ namespace SnapStudio
         {
             var st = TrayApp.Instance != null && !TrayApp.Instance.Headless ? TrayApp.Instance.Settings : null;
             if (st == null) return;
-            int c = curColor.ToArgb(), w = (int)curWidth, f = (int)curFont, rr = (int)curRadius;
-            if (st.EditorColor == c && st.EditorWidth == w && st.EditorFont == f && st.EditorRounded == curRounded && st.EditorRadius == rr) return;
+            int c = curColor.ToArgb(), w = (int)curWidth, f = (int)curFont, rr = (int)curRadius, fo = (int)Math.Round(curFill * 100);
+            if (st.EditorColor == c && st.EditorWidth == w && st.EditorFont == f && st.EditorRounded == curRounded && st.EditorRadius == rr
+                && st.EditorFill == curFillOn && st.EditorFillOpacity == fo && st.EditorTextOutline == curOutline) return;
             st.EditorColor = c; st.EditorWidth = w; st.EditorFont = f;
             st.EditorRounded = curRounded; st.EditorRadius = rr;
+            st.EditorFill = curFillOn; st.EditorFillOpacity = fo; st.EditorTextOutline = curOutline;
             styleChanged = true;
         }
 
@@ -1361,8 +1522,61 @@ namespace SnapStudio
                     sldRadius.SetSilently((int)curRadius); lblRadiusVal.Text = (int)curRadius + " px";
                     sldRadius.Enabled = curRounded;
                 }
+                if (tglFill != null)
+                {
+                    tglFill.Checked = curFillOn;
+                    sldFill.SetSilently((int)Math.Round(curFill * 100)); lblFillVal.Text = (int)Math.Round(curFill * 100) + "%";
+                }
+                foreach (var b in outlineButtons) b.Checked = (int)b.Tag == curOutline;
             }
             finally { syncing = false; }
+        }
+
+        /// <summary>Liga/desliga o preenchimento (e aplica à caixa/elipse selecionada).</summary>
+        void SetFill(bool on)
+        {
+            curFillOn = on;
+            RememberStyle();
+            LayoutProps();
+            var sh = selected as ShapeAnn;
+            if (sh != null && anns.Contains(sh) && (sh.Kind == "rect" || sh.Kind == "ellipse") && (sh.Fill > 0) != on)
+            {
+                PushUndo();
+                sh.Fill = on ? curFill : 0;
+                MarkModified();
+                Dirty();
+            }
+        }
+
+        void SetFillOpacity(float o)
+        {
+            curFill = Math.Max(0.1f, Math.Min(1f, o));
+            RememberStyle();
+            if (lblFillVal != null) lblFillVal.Text = (int)Math.Round(curFill * 100) + "%";
+            var sh = selected as ShapeAnn;
+            if (curFillOn && sh != null && anns.Contains(sh) && (sh.Kind == "rect" || sh.Kind == "ellipse") && sh.Fill != curFill)
+            {
+                PushUndo();
+                sh.Fill = curFill;
+                MarkModified();
+                Dirty();
+            }
+        }
+
+        /// <summary>Contorno do texto: 0 automático, 1 branco, 2 preto, 3 nenhum.</summary>
+        void SetTextOutline(int o)
+        {
+            curOutline = o;
+            RememberStyle();
+            foreach (var b in outlineButtons) b.Checked = (int)b.Tag == o;
+            var t = selected as TextAnn;
+            if (t != null && anns.Contains(t) && t.Outline != o)
+            {
+                PushUndo();
+                t.Outline = o;
+                MarkModified();
+                Dirty();
+            }
         }
 
         /// <summary>Liga/desliga os cantos arredondados (e aplica à anotação selecionada).</summary>
@@ -1370,6 +1584,7 @@ namespace SnapStudio
         {
             curRounded = on;
             RememberStyle();
+            LayoutProps();
             if (sldRadius != null) sldRadius.Enabled = on;
             var sh = selected as ShapeAnn;
             if (sh != null && anns.Contains(sh) && sh.IsRoundable && (sh.Radius > 0) != on)
@@ -1409,7 +1624,15 @@ namespace SnapStudio
                 curRounded = sh.Radius > 0;
                 if (sh.Radius > 0) curRadius = sh.Radius;
             }
+            if (sh != null && (sh.Kind == "rect" || sh.Kind == "ellipse"))
+            {
+                curFillOn = sh.Fill > 0;
+                if (sh.Fill > 0) curFill = sh.Fill;
+            }
+            var ta = selected as TextAnn;
+            if (ta != null) curOutline = ta.Outline;
             SyncSliders();
+            LayoutProps();
         }
 
         void DeleteSelected()

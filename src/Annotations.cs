@@ -131,6 +131,8 @@ namespace SnapStudio
         [DataMember] public float X1, Y1, X2, Y2;
         /// <summary>Raio dos cantos (0 = cantos vivos). Caixa, marcador, esbater, pixelizar; na seta, &gt; 0 arredonda a ponta.</summary>
         [DataMember] public float Radius;
+        /// <summary>Opacidade do preenchimento de caixas e elipses (0 = só a borda; 0..1).</summary>
+        [DataMember] public float Fill;
 
         public bool IsRoundable { get { return Kind == "arrow" || Kind == "rect" || Kind == "highlight" || Kind == "blur" || Kind == "pixelate"; } }
 
@@ -187,6 +189,10 @@ namespace SnapStudio
                         g.DrawLine(pen, X1, Y1, X2, Y2);
                     break;
                 case "rect":
+                    if (Fill > 0)
+                        using (var fb = new SolidBrush(Color.FromArgb((int)Math.Round(Math.Min(1f, Fill) * 255), Color)))
+                        using (var fp = RoundedPath(r, Radius))
+                            g.FillPath(fb, fp);
                     using (var pen = new Pen(Color, Width) { LineJoin = LineJoin.Miter })
                     {
                         if (Radius > 0) using (var path = RoundedPath(r, Radius)) g.DrawPath(pen, path);
@@ -194,6 +200,9 @@ namespace SnapStudio
                     }
                     break;
                 case "ellipse":
+                    if (Fill > 0)
+                        using (var fb = new SolidBrush(Color.FromArgb((int)Math.Round(Math.Min(1f, Fill) * 255), Color)))
+                            g.FillEllipse(fb, r);
                     using (var pen = new Pen(Color, Width))
                         g.DrawEllipse(pen, r);
                     break;
@@ -228,6 +237,8 @@ namespace SnapStudio
         [DataMember] public float X, Y;
         [DataMember] public string Text;
         [DataMember] public float Size;
+        /// <summary>Contorno: 0 = automático (contraste), 1 = branco, 2 = preto, 3 = nenhum.</summary>
+        [DataMember] public int Outline;
 
         public override bool UsesFont { get { return true; } }
         public override bool UsesWidth { get { return false; } }
@@ -258,10 +269,14 @@ namespace SnapStudio
         public override void Draw(Graphics g, Bitmap baseImage)
         {
             using (var path = BuildPath())
-            using (var halo = new Pen(Contrast(Color), Math.Max(2f, Size / 5f)) { LineJoin = LineJoin.Round })
             using (var b = new SolidBrush(Color))
             {
-                g.DrawPath(halo, path);
+                if (Outline != 3)
+                {
+                    Color hc = Outline == 1 ? Color.White : Outline == 2 ? Color.FromArgb(17, 17, 17) : Contrast(Color);
+                    using (var halo = new Pen(hc, Math.Max(2f, Size / 5f)) { LineJoin = LineJoin.Round })
+                        g.DrawPath(halo, path);
+                }
                 g.FillPath(b, path);
             }
         }

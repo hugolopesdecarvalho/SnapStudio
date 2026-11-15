@@ -105,6 +105,34 @@ enum SelfTest {
         let oldJSON = Data("[{\"id\":\"\(UUID().uuidString)\",\"kind\":\"rect\",\"argb\":4293205033,\"width\":4,\"x1\":1,\"y1\":2,\"x2\":30,\"y2\":40,\"text\":\"\",\"size\":26,\"number\":0,\"pts\":[]}]".utf8)
         let old = Ann.deserialize(oldJSON)
         guard old.count == 1, old[0].cornerRadius == 0 else { print("FALHA: anotações antigas"); return false }
+        // preenchimento: o centro de uma caixa/elipse preenchida tem cor; sem preenchimento fica o fundo
+        func renderOn(_ bgColor: CGColor, _ anns: [Ann]) -> CGImage? {
+            let gc = CGContext(data: nil, width: 220, height: 120, bitsPerComponent: 8, bytesPerRow: 0, space: cs,
+                               bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            gc.setFillColor(bgColor); gc.fill(CGRect(x: 0, y: 0, width: 220, height: 120))
+            return AnnRenderer().render(base: gc.makeImage()!, anns: anns)
+        }
+        func centre(fill: CGFloat?) -> [UInt8]? {
+            let b = Ann(kind: .rect, argb: ArgbColor.rgb(37, 99, 235)); b.p1 = CGPoint(x: 10, y: 10); b.p2 = CGPoint(x: 100, y: 100); b.width = 4; b.fill = fill
+            let e = Ann(kind: .ellipse, argb: ArgbColor.rgb(37, 99, 235)); e.p1 = CGPoint(x: 120, y: 10); e.p2 = CGPoint(x: 210, y: 100); e.width = 4; e.fill = fill
+            guard let img = renderOn(NSColor.white.cgColor, [b, e]) else { return nil }
+            if fill != nil { try? ImageUtil.save(img, to: outDir.appendingPathComponent("fill.png")) }
+            return (pixels(img, CGRect(x: 55, y: 55, width: 1, height: 1)) ?? []) + (pixels(img, CGRect(x: 165, y: 55, width: 1, height: 1)) ?? [])
+        }
+        guard let empty = centre(fill: nil), let filled = centre(fill: 0.5), empty[0] > 250, empty[4] > 250, filled[0] < 200, filled[4] < 200 else {
+            print("FALHA: preenchimento"); return false
+        }
+        // contorno do texto: "nenhum" não tem branco; "branco" tem
+        func whitePixels(_ o: TextOutline) -> Int {
+            let t = Ann(kind: .text, argb: ArgbColor.red); t.p1 = CGPoint(x: 10, y: 20); t.text = "Hello"; t.size = 48; t.outline = o.rawValue
+            guard let img = renderOn(NSColor.gray.cgColor, [t]), let px = pixels(img, CGRect(x: 0, y: 0, width: 220, height: 120)) else { return -1 }
+            if o == .white { try? ImageUtil.save(img, to: outDir.appendingPathComponent("outline-white.png")) }
+            return stride(from: 0, to: px.count, by: 4).filter { px[$0] > 230 && px[$0 + 1] > 230 && px[$0 + 2] > 230 }.count
+        }
+        guard whitePixels(.none) == 0, whitePixels(.white) > 100, whitePixels(.black) == 0 else {
+            print("FALHA: contorno do texto (nenhum=\(whitePixels(.none)), branco=\(whitePixels(.white)))"); return false
+        }
+
         let rr = Ann(kind: .rect, argb: 0); rr.radius = 14
         guard Ann.deserialize(Ann.serialize([rr])).first?.radius == 14 else { print("FALHA: raio na serialização"); return false }
 

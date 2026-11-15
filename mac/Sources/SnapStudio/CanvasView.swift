@@ -189,6 +189,7 @@ final class CanvasView: NSView, NSTextViewDelegate, NSMenuItemValidation {
             sa.p1 = p; sa.p2 = p
             sa.width = model.width
             if sa.isRoundable { sa.radius = model.newRadius }
+            if sa.kind.usesFill { sa.fill = model.newFill }
             model.live = sa
             drag = .create
             needsDisplay = true
@@ -461,6 +462,7 @@ final class CanvasView: NSView, NSTextViewDelegate, NSMenuItemValidation {
             t.p1 = textPos
             t.text = txt
             t.size = textSize
+            t.outline = model.textOutline.rawValue
             model.add(t)
         }
         editingText = nil

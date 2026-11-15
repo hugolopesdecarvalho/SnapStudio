@@ -46,7 +46,7 @@ The video is saved as MP4 (H.264) and copied as a file (⌘V in Finder, Mail, Te
 ## Editor
 Select (V), Arrow (A), Box (R), Text (T), **Blur** (B) and Pixelate (X) to hide areas, Highlighter (H), Step number (N), Ellipse (E), Line (L), Freehand (P), Crop (C).
 ⌘S save · ⇧⌘S save as · ⌘C copy · ⌘Z/⇧⌘Z undo/redo · ⌫ deletes · arrow keys move (⇧ = 10 px) · ⇧ while drawing = 45° angles/squares · pinch or ⌘+wheel = zoom · ⌘9 fit · ⌘0 actual size · *Drag* button to drop the image into another app.
-After placing an annotation the editor returns to Select (V) with it selected; numbered steps and freehand stay active. *Rounded corners* (with a radius slider) in the full editor's properties applies to boxes, arrows, the highlighter, blur and pixelate.
+After placing an annotation the editor returns to Select (V) with it selected; numbered steps and freehand stay active. The full editor's properties panel shows only what applies to the selected annotation or active tool: color, width, text size, text *Outline* (auto/white/black/none), *Fill* with opacity (boxes, ellipses), *Rounded corners* with a radius (boxes, highlighter, blur, pixelate) and *Rounded tip* (arrows).
 Annotations stay editable when you reopen a capture (helper files in `~/Library/Application Support/SnapStudio/edit`).
 
 ## History

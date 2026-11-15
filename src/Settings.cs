@@ -32,6 +32,9 @@ namespace SnapStudio
         [DataMember] public int EditorFont;           // último tamanho do texto (px; 0 = omissão)
         [DataMember] public bool EditorRounded;       // cantos arredondados (caixas, setas, marcador, esbater)
         [DataMember] public int EditorRadius;         // raio dos cantos (px)
+        [DataMember] public bool EditorFill;          // preencher caixas e elipses
+        [DataMember] public int EditorFillOpacity;    // opacidade do preenchimento (%)
+        [DataMember] public int EditorTextOutline;    // contorno do texto: 0 auto, 1 branco, 2 preto, 3 nenhum
         [DataMember] public bool AutoUpdateCheck;     // procurar versões novas no GitHub (uma vez por dia)
         [DataMember] public long LastUpdateCheck;     // DateTime.UtcNow.Ticks da última verificação
         [DataMember] public string SkippedVersion;    // "Ignorar esta versão"
@@ -59,6 +62,7 @@ namespace SnapStudio
             VideoCursor = true;
             AutoUpdateCheck = true;
             EditorRadius = 12;
+            EditorFillOpacity = 25;
             ThemeMode = "system";
             Accent = "indigo";
             AfterCapture = null; // definido em Load (migra o antigo OpenEditor)

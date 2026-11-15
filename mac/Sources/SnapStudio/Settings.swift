@@ -73,6 +73,9 @@ final class Settings: Codable {
     var editorFont: Int = 0
     var editorRounded = false                 // cantos arredondados (caixas, setas, marcador, esbater)
     var editorRadius: Int = 12                // raio em pixels da imagem
+    var editorFill = false                    // preencher caixas e elipses
+    var editorFillOpacity: Int = 25           // opacidade do preenchimento (%)
+    var editorTextOutline: Int = 0            // contorno do texto (TextOutline)
     var panelWidth: Int = 0                   // tamanho do painel da barra de menus (pontos; 0 = omissão)
     var panelHeight: Int = 0
     var autoUpdateCheck = true                // procurar versões novas no GitHub (uma vez por dia)
@@ -84,7 +87,8 @@ final class Settings: Codable {
     enum CodingKeys: String, CodingKey {
         case outputFolder, format, copyToClipboard, showNotification, afterCapture, themeMode, accent
         case hotkeyRegion, hotkeyWindow, hotkeyFull, hotkeyRecord, videoFps, videoCursor
-        case editorColor, editorWidth, editorFont, editorRounded, editorRadius, panelWidth, panelHeight
+        case editorColor, editorWidth, editorFont, editorRounded, editorRadius, editorFill, editorFillOpacity, editorTextOutline
+        case panelWidth, panelHeight
         case autoUpdateCheck, lastUpdateCheck, skippedVersion
     }
 
@@ -112,6 +116,9 @@ final class Settings: Codable {
         editorFont = v(.editorFont, editorFont)
         editorRounded = v(.editorRounded, editorRounded)
         editorRadius = v(.editorRadius, editorRadius)
+        editorFill = v(.editorFill, editorFill)
+        editorFillOpacity = v(.editorFillOpacity, editorFillOpacity)
+        editorTextOutline = v(.editorTextOutline, editorTextOutline)
         panelWidth = v(.panelWidth, panelWidth)
         panelHeight = v(.panelHeight, panelHeight)
         autoUpdateCheck = v(.autoUpdateCheck, autoUpdateCheck)

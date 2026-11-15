@@ -73,6 +73,41 @@ enum Tool: String, CaseIterable {
 
 enum AnnKind: String, Codable {
     case arrow, line, rect, ellipse, highlight, blur, pixelate, text, step, pen
+
+    // Propriedades que têm efeito em cada tipo (o painel só mostra estas).
+    var usesColor: Bool { self != .blur && self != .pixelate }
+    var usesWidth: Bool { [.arrow, .line, .rect, .ellipse, .pen].contains(self) }
+    var usesFont: Bool { self == .text || self == .step }
+    var usesRounded: Bool { [.arrow, .rect, .highlight, .blur, .pixelate].contains(self) }
+    /// Na seta só conta ligado/desligado (ponta arredondada); o raio não muda nada.
+    var usesRadius: Bool { [.rect, .highlight, .blur, .pixelate].contains(self) }
+    var usesFill: Bool { self == .rect || self == .ellipse }
+    var usesOutline: Bool { self == .text }
+}
+
+/// Contorno do texto.
+enum TextOutline: Int, CaseIterable {
+    case auto = 0, white, black, none
+    var title: String {
+        switch self {
+        case .auto: return S.t("Auto", "Auto")
+        case .white: return S.t("Branco", "White")
+        case .black: return S.t("Preto", "Black")
+        case .none: return S.t("Nenhum", "None")
+        }
+    }
+}
+
+extension Tool {
+    /// Tipo de anotação que esta ferramenta cria (nil: selecionar, recortar).
+    var annKind: AnnKind? {
+        switch self {
+        case .text: return .text
+        case .step: return .step
+        case .pen: return .pen
+        default: return shapeKind
+        }
+    }
 }
 
 /// Anotação editável (objeto, só pintado na imagem ao guardar). Coordenadas em pixels da imagem, origem no canto superior esquerdo.
@@ -88,8 +123,15 @@ final class Ann: Codable, Identifiable {
     var pts: [CGFloat] = []
     /// Raio dos cantos em pixels da imagem (nil/0 = cantos vivos). Opcional para abrir anotações antigas.
     var radius: CGFloat?
+    /// Opacidade do preenchimento de caixas e elipses (nil/0 = só a borda).
+    var fill: CGFloat?
+    /// Contorno do texto (TextOutline.rawValue; nil = automático).
+    var outline: Int?
 
     init(kind: AnnKind, argb: UInt32) { self.kind = kind; self.argb = argb }
+
+    var fillOpacity: CGFloat { max(0, min(1, fill ?? 0)) }
+    var textOutline: TextOutline { TextOutline(rawValue: outline ?? 0) ?? .auto }
 
     var cornerRadius: CGFloat { max(0, radius ?? 0) }
     /// Formas que aceitam cantos arredondados.
@@ -387,13 +429,22 @@ final class AnnRenderer {
             g.move(to: a.p1); g.addLine(to: a.p2); g.strokePath()
             g.restoreGState()
         case .rect:
+            let path = Geo.roundedRect(Geo.norm(a.p1, a.p2), a.cornerRadius)
             g.saveGState()
+            if a.fillOpacity > 0 {
+                g.setFillColor(ArgbColor.ns(a.argb).withAlphaComponent(a.fillOpacity).cgColor)
+                g.addPath(path); g.fillPath()
+            }
             g.setStrokeColor(col); g.setLineWidth(a.width); g.setLineJoin(.miter)
-            g.addPath(Geo.roundedRect(Geo.norm(a.p1, a.p2), a.cornerRadius))
+            g.addPath(path)
             g.strokePath()
             g.restoreGState()
         case .ellipse:
             g.saveGState()
+            if a.fillOpacity > 0 {
+                g.setFillColor(ArgbColor.ns(a.argb).withAlphaComponent(a.fillOpacity).cgColor)
+                g.fillEllipse(in: Geo.norm(a.p1, a.p2))
+            }
             g.setStrokeColor(col); g.setLineWidth(a.width)
             g.strokeEllipse(in: Geo.norm(a.p1, a.p2))
             g.restoreGState()
@@ -408,11 +459,20 @@ final class AnnRenderer {
         case .text:
             let path = Geo.textPath(a.text, size: a.size, at: a.p1)
             g.saveGState()
-            g.addPath(path)
-            g.setLineJoin(.round)
-            g.setLineWidth(max(2, a.size / 5))
-            g.setStrokeColor(ArgbColor.ns(ArgbColor.contrast(a.argb)).cgColor)
-            g.strokePath()
+            let halo: UInt32?
+            switch a.textOutline {
+            case .auto: halo = ArgbColor.contrast(a.argb)
+            case .white: halo = ArgbColor.rgb(255, 255, 255)
+            case .black: halo = ArgbColor.rgb(17, 17, 17)
+            case .none: halo = nil
+            }
+            if let h = halo {
+                g.addPath(path)
+                g.setLineJoin(.round)
+                g.setLineWidth(max(2, a.size / 5))
+                g.setStrokeColor(ArgbColor.ns(h).cgColor)
+                g.strokePath()
+            }
             g.addPath(path)
             g.setFillColor(col)
             g.fillPath()
