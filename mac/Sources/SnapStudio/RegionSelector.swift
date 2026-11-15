@@ -47,11 +47,13 @@ final class RegionSelector {
             v.bar = bar
             sel.windows.append(w)
             w.setFrame(shot.frame, display: true)
+            w.initialFirstResponder = v
             w.orderFrontRegardless()
-            if shot.frame.contains(mouse) { w.makeKeyAndOrderFront(nil) }
         }
-        NSApp.activate(ignoringOtherApps: true)
-        if !sel.windows.contains(where: { $0.isKeyWindow }) { sel.windows.first?.makeKeyAndOrderFront(nil) }
+        // o ecrã debaixo do rato fica com o teclado; a vista recebe as teclas diretamente
+        let key = sel.windows.first(where: { $0.frame.contains(mouse) }) ?? sel.windows.first
+        key?.makeKeyAndOrderFront(nil)
+        if let k = key { k.makeFirstResponder(k.contentView) }
         NSCursor.crosshair.set()
     }
 
@@ -86,9 +88,14 @@ final class RegionSelector {
     }
 }
 
-final class OverlayWindow: NSWindow {
+/// Painel "não ativante": recebe o teclado (Esc, Enter, A) logo ao aparecer, sem ter de ativar a app.
+/// (No macOS 14+, uma app em segundo plano não pode passar para a frente sozinha ao premir um atalho global.)
+final class OverlayWindow: NSPanel {
     init(shot: ScreenShot) {
-        super.init(contentRect: shot.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        super.init(contentRect: shot.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        becomesKeyOnlyIfNeeded = false
+        hidesOnDeactivate = false
+        isFloatingPanel = true
         level = .screenSaver
         isOpaque = true
         backgroundColor = .black
@@ -133,7 +140,9 @@ final class OverlayView: NSView {
     override func cursorUpdate(with event: NSEvent) { NSCursor.crosshair.set() }
 
     override func mouseEntered(with event: NSEvent) {
+        // vários ecrãs: o teclado acompanha o rato
         window?.makeKey()
+        window?.makeFirstResponder(self)
         NSCursor.crosshair.set()
     }
 

@@ -7,6 +7,22 @@ final class SettingsStore: ObservableObject {
     var s: Settings { AppController.shared.settings }
     @Published var loginOn = Settings.startAtLogin
     @Published var permission = Capture.hasPermission
+    @Published var updateTick = 0
+    @Published var tab = SettingsStore.pendingTab ?? "general"
+    static var pendingTab: String?
+    private var tokens: [NSObjectProtocol] = []
+
+    init() {
+        SettingsStore.pendingTab = nil
+        let nc = NotificationCenter.default
+        tokens.append(nc.addObserver(forName: .snapUpdateChanged, object: nil, queue: .main) { [weak self] _ in
+            self?.updateTick += 1
+        })
+        tokens.append(nc.addObserver(forName: .snapShowSettingsTab, object: nil, queue: .main) { [weak self] n in
+            if let t = n.object as? String { self?.tab = t }
+        })
+    }
+    deinit { tokens.forEach(NotificationCenter.default.removeObserver) }
 
     func bind<T>(_ kp: ReferenceWritableKeyPath<Settings, T>, then: (() -> Void)? = nil) -> Binding<T> {
         Binding(get: { self.s[keyPath: kp] }, set: {
@@ -22,18 +38,76 @@ struct SettingsView: View {
     @StateObject private var st = SettingsStore()
     @StateObject private var theme = ThemeObserver()
 
+    static let size = CGSize(width: 760, height: 500)
+
+    /// Secções da barra lateral (as mesmas da versão Windows).
+    private var sections: [(id: String, title: String, symbol: String)] {
+        [("general", S.t("Geral", "General"), "gearshape"),
+         ("appearance", S.t("Aparência", "Appearance"), "paintpalette"),
+         ("after", S.t("Depois de capturar", "After capture"), "square.and.pencil"),
+         ("shortcuts", S.t("Atalhos", "Shortcuts"), "keyboard"),
+         ("files", S.t("Ficheiros", "Files"), "folder"),
+         ("video", S.t("Vídeo", "Video"), "video"),
+         ("about", S.t("Sobre", "About"), "info.circle")]
+    }
+
     var body: some View {
-        TabView {
-            general.tabItem { Label(S.t("Geral", "General"), systemImage: "gearshape") }
-            appearance.tabItem { Label(S.t("Aparência", "Appearance"), systemImage: "paintpalette") }
-            after.tabItem { Label(S.t("Depois de capturar", "After capture"), systemImage: "square.and.pencil") }
-            shortcuts.tabItem { Label(S.t("Atalhos", "Shortcuts"), systemImage: "keyboard") }
-            files.tabItem { Label(S.t("Ficheiros", "Files"), systemImage: "folder") }
-            video.tabItem { Label(S.t("Vídeo", "Video"), systemImage: "video") }
+        HStack(spacing: 0) {
+            sidebar
+            Divider()
+            VStack(alignment: .leading, spacing: 0) {
+                Text(sections.first(where: { $0.id == st.tab })?.title ?? "")
+                    .font(.system(size: 22, weight: .bold))
+                    .padding(.horizontal, 24)
+                    .padding(.top, 22)
+                    .padding(.bottom, 4)
+                page(st.tab)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(20)
-        .frame(width: 560, height: 430)
+        .frame(width: Self.size.width, height: Self.size.height)
         .id(theme.tick)
+    }
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                Image(nsImage: AppIcon.image(size: 28))
+                Text(S.t("Definições", "Settings")).font(.system(size: 16, weight: .bold))
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 20)
+            .padding(.bottom, 12)
+            List(selection: Binding<String?>(get: { st.tab }, set: { if let v = $0 { st.tab = v } })) {
+                ForEach(sections, id: \.id) { s in
+                    Label(s.title, systemImage: s.symbol)
+                        .padding(.vertical, 3)
+                        .tag(s.id as String?)
+                }
+            }
+            .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            Spacer(minLength: 0)
+            Text(S.t("Versão ", "Version ") + UpdateChecker.currentVersion)
+                .font(.caption).foregroundStyle(.tertiary)
+                .padding(.horizontal, 18).padding(.bottom, 14)
+        }
+        .frame(width: 210)
+        .background(.background.secondary)
+    }
+
+    @ViewBuilder
+    private func page(_ id: String) -> some View {
+        switch id {
+        case "appearance": appearance
+        case "after": after
+        case "shortcuts": shortcuts
+        case "files": files
+        case "video": video
+        case "about": about
+        default: general
+        }
     }
 
     // ---------- Geral ----------
@@ -46,8 +120,6 @@ struct SettingsView: View {
                 Settings.startAtLogin = $0
                 st.loginOn = Settings.startAtLogin
             }))
-            Toggle(S.t("Copiar a captura para a área de transferência", "Copy the capture to the clipboard"), isOn: st.bind(\.copyToClipboard))
-            Toggle(S.t("Mostrar notificações", "Show notifications"), isOn: st.bind(\.showNotification))
             Section {
                 HStack {
                     Image(systemName: permission ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
@@ -102,7 +174,7 @@ struct SettingsView: View {
 
     private var after: some View {
         Form {
-            Picker(S.t("Depois de capturar, abrir", "After capturing, open"), selection: st.bind(\.afterCapture)) {
+            Picker(S.t("Abrir", "Open"), selection: st.bind(\.afterCapture)) {
                 VStack(alignment: .leading) {
                     Text(S.t("Editor rápido", "Quick editor"))
                     Text(S.t("Pop-up junto à barra de menus: seta, caixa, texto, esbater, passos, recorte.", "Pop-up by the menu bar: arrow, box, text, blur, steps, crop."))
@@ -120,6 +192,14 @@ struct SettingsView: View {
                 }.tag("none")
             }
             .pickerStyle(.radioGroup)
+            Section {
+                Toggle(S.t("Copiar para a área de transferência", "Copy to the clipboard"), isOn: st.bind(\.copyToClipboard))
+                Toggle(S.t("Mostrar notificação", "Show a notification"), isOn: st.bind(\.showNotification))
+            } footer: {
+                Text(S.t("A imagem fica pronta para colar com ⌘V. A notificação aparece quando nada abre depois de capturar e quando um vídeo é guardado.",
+                         "The image is ready to paste with ⌘V. The notification appears when nothing opens after a capture and when a video is saved."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
     }
@@ -197,6 +277,64 @@ struct SettingsView: View {
             Toggle(S.t("Mostrar o cursor no vídeo", "Show the cursor in the video"), isOn: st.bind(\.videoCursor))
             Text(S.t("Os vídeos são guardados em MP4 (H.264) na pasta das capturas, sem som.", "Videos are saved as MP4 (H.264) in the captures folder, without sound."))
                 .font(.caption).foregroundStyle(.secondary)
+        }
+        .formStyle(.grouped)
+    }
+}
+
+// ================= Sobre: versão e atualizações =================
+
+extension SettingsView {
+    var about: some View {
+        let up = UpdateChecker.shared
+        let _ = st.updateTick
+        let last = st.s.lastUpdateCheck
+        let lastText: String = {
+            guard last > 0 else { return S.t("Ainda não foi verificado.", "Not checked yet.") }
+            let f = DateFormatter()
+            f.locale = Locale(identifier: S.pt ? "pt_PT" : "en_US")
+            f.dateStyle = .medium; f.timeStyle = .short
+            return S.t("Última verificação: ", "Last checked: ") + f.string(from: Date(timeIntervalSince1970: last))
+        }()
+        return Form {
+            Section {
+                HStack(spacing: 14) {
+                    Image(nsImage: AppIcon.image(size: 64))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("SnapStudio").font(.title2.bold())
+                        Text(S.t("Versão ", "Version ") + UpdateChecker.currentVersion).foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                    Spacer()
+                }
+                .padding(.vertical, 4)
+            }
+            Section {
+                if let r = up.pending {
+                    HStack {
+                        Image(systemName: "arrow.down.circle.fill").foregroundStyle(Theme.accentColor)
+                        Text(S.t("Está disponível a versão \(r.version).", "Version \(r.version) is available."))
+                        Spacer()
+                        Button(S.t("Ver e descarregar…", "View and download…")) { up.showUpdateDialog(r) }
+                            .buttonStyle(.borderedProminent)
+                    }
+                }
+                HStack {
+                    Text(up.checking ? S.t("A procurar…", "Checking…") : lastText).foregroundStyle(.secondary)
+                    Spacer()
+                    Button(S.t("Procurar atualizações", "Check for Updates")) { up.check(interactive: true) }
+                        .disabled(up.checking)
+                }
+                Toggle(S.t("Procurar atualizações automaticamente", "Check for updates automatically"), isOn: st.bind(\.autoUpdateCheck))
+            } footer: {
+                Text(S.t("A SnapStudio consulta a página de versões no GitHub uma vez por dia. Não envia dados seus.",
+                         "SnapStudio checks the releases page on GitHub once a day. No personal data is sent."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                Link(S.t("Página do projeto no GitHub", "Project page on GitHub"), destination: UpdateChecker.repoURL)
+                Link(S.t("Todas as versões", "All releases"), destination: UpdateChecker.releasesURL)
+            }
         }
         .formStyle(.grouped)
     }

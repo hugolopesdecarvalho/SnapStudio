@@ -277,6 +277,7 @@ final class EditorModel: ObservableObject {
         p.directoryURL = fileURL.deletingLastPathComponent()
         p.isExtensionHidden = false
         dialogOpen = true
+        NSApp.activate()      // o diálogo precisa do teclado (o editor rápido não ativa a app)
         let done: (NSApplication.ModalResponse) -> Void = { [weak self] r in
             guard let self = self else { return }
             self.dialogOpen = false
@@ -312,6 +313,7 @@ final class EditorModel: ObservableObject {
         a.messageText = "SnapStudio"
         a.informativeText = text
         a.alertStyle = .warning
+        NSApp.activate()
         a.runModal()
         dialogOpen = false
     }

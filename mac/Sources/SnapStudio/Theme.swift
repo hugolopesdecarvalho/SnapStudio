@@ -73,6 +73,8 @@ extension Notification.Name {
     static let snapThemeChanged = Notification.Name("SnapStudio.themeChanged")
     static let snapCapturesChanged = Notification.Name("SnapStudio.capturesChanged")
     static let snapRecordingChanged = Notification.Name("SnapStudio.recordingChanged")
+    static let snapUpdateChanged = Notification.Name("SnapStudio.updateChanged")
+    static let snapShowSettingsTab = Notification.Name("SnapStudio.showSettingsTab")
 }
 
 /// Observável para as vistas SwiftUI reagirem a mudanças de tema/destaque.

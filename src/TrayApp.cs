@@ -69,7 +69,9 @@ namespace SnapStudio
         TrayPanel panel;
         HistoryForm history;
         SettingsForm settingsForm;
-        ToolStripMenuItem miRegion, miFull, miStartup, miRecord;
+        ToolStripMenuItem miRegion, miFull, miStartup, miRecord, miUpdate;
+        Timer updateTimer;
+        bool lastBalloonIsUpdate;
         ScreenRecording recording;
         public bool IsRecording { get { return recording != null; } }
         string lastBalloonPath;
@@ -101,12 +103,22 @@ namespace SnapStudio
             };
             panel = new TrayPanel();
             tray.MouseClick += (s, e) => { if (e.Button == MouseButtons.Left) panel.Toggle(); };
-            tray.BalloonTipClicked += delegate { if (lastBalloonPath != null && File.Exists(lastBalloonPath)) OpenQuickEditor(lastBalloonPath, null); };
+            tray.BalloonTipClicked += delegate
+            {
+                if (lastBalloonIsUpdate) { if (Updates.Available != null) UpdateForm.ShowFor(Updates.Available); return; }
+                if (lastBalloonPath != null && File.Exists(lastBalloonPath)) OpenQuickEditor(lastBalloonPath, null);
+            };
 
             msg = new MessageWindow();
             msg.HotkeyPressed += OnHotkey;
             msg.ShowRequested += ShowHistory;
             RegisterHotkeys(true);
+
+            // versões novas no GitHub: pouco depois de arrancar e depois de hora a hora (só verifica de facto 1×/dia)
+            updateTimer = new Timer { Interval = 8000 };
+            updateTimer.Tick += delegate { updateTimer.Interval = 3600 * 1000; Updates.CheckIfDue(); };
+            updateTimer.Start();
+            Updates.Changed += delegate { if (panel != null && !panel.IsDisposed) panel.Invalidate(); };
 
             Theme.Changed += OnThemeChanged;
             SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
@@ -171,6 +183,12 @@ namespace SnapStudio
             };
             m.Items.Add(miStartup);
             m.Items.Add(new ToolStripMenuItem(S.T("Definições…", "Settings…"), ToolIcons.Get("settings", s, ink), delegate { ShowSettings(); }));
+            miUpdate = new ToolStripMenuItem(S.T("Procurar atualizações…", "Check for updates…"), null, delegate
+            {
+                var p = Updates.Pending;
+                if (p != null) UpdateForm.ShowFor(p); else Updates.Check(true);
+            });
+            m.Items.Add(miUpdate);
             m.Items.Add(new ToolStripSeparator());
             m.Items.Add(S.T("Sair", "Exit"), null, delegate { Exit(); });
             m.Opening += delegate { miStartup.Checked = SafeStartup(); UpdateMenuShortcuts(); };
@@ -186,12 +204,24 @@ namespace SnapStudio
             miFull.ShortcutKeyDisplayString = Settings.HotkeyFull != 0 ? Settings.HotkeyText(Settings.HotkeyFull) : null;
             miRecord.Text = IsRecording ? S.T("Parar a gravação", "Stop recording") : S.T("Gravar vídeo do ecrã", "Record screen video");
             miRecord.ShortcutKeyDisplayString = Settings.HotkeyRecord != 0 ? Settings.HotkeyText(Settings.HotkeyRecord) : null;
+            var pu = Updates.Pending;
+            miUpdate.Text = pu != null ? S.T("Atualizar para a versão ", "Update to version ") + pu.Version + "…" : S.T("Procurar atualizações…", "Check for updates…");
         }
 
         void Balloon(string title, string text, ToolTipIcon icon, string path)
         {
             lastBalloonPath = path;
+            lastBalloonIsUpdate = false;
             tray.ShowBalloonTip(4000, title, text, icon);
+        }
+
+        /// <summary>Aviso de versão nova (clicar no balão abre a janela de atualização).</summary>
+        public void NotifyUpdate(ReleaseInfo r)
+        {
+            Balloon(S.T("Nova versão da SnapStudio", "New SnapStudio version"),
+                    S.T("A versão ", "Version ") + r.Version + S.T(" está disponível (tem a ", " is available (you have ") + Updates.CurrentVersion +
+                    S.T("). Clique para ver as novidades.", "). Click to see what's new."), ToolTipIcon.Info, null);
+            lastBalloonIsUpdate = true;
         }
 
         public void ToggleTheme()
@@ -439,12 +469,15 @@ namespace SnapStudio
             Native.SetForegroundWindow(history.Handle);
         }
 
-        public void ShowSettings()
+        public void ShowSettings() { ShowSettings(null); }
+
+        /// <summary>Abre as Definições, opcionalmente numa página ("general", "look", …, "about").</summary>
+        public void ShowSettings(string page)
         {
-            if (settingsForm != null && !settingsForm.IsDisposed) { settingsForm.Activate(); return; }
+            if (settingsForm != null && !settingsForm.IsDisposed) { if (page != null) settingsForm.ShowPage(page); settingsForm.Activate(); return; }
             string oldFolder = Settings.OutputFolder;
             msg.UnregisterAll(); // para poder carregar nas teclas dentro da caixa de atalhos
-            using (settingsForm = new SettingsForm(Settings))
+            using (settingsForm = new SettingsForm(Settings, page))
             {
                 if (settingsForm.ShowDialog() == DialogResult.OK)
                 {

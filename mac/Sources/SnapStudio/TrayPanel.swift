@@ -10,13 +10,14 @@ final class TrayModel: ObservableObject {
     @Published var recording = false
     @Published var openEditor = true
     @Published var clipboardHasImage = false
+    @Published var update: ReleaseInfo?
     private var tokens: [NSObjectProtocol] = []
     static let maxTiles = 40
 
     init() {
         refresh()
         let nc = NotificationCenter.default
-        for n in [Notification.Name.snapCapturesChanged, .snapRecordingChanged, .snapThemeChanged] {
+        for n in [Notification.Name.snapCapturesChanged, .snapRecordingChanged, .snapThemeChanged, .snapUpdateChanged] {
             tokens.append(nc.addObserver(forName: n, object: nil, queue: .main) { [weak self] _ in self?.refresh() })
         }
     }
@@ -29,6 +30,7 @@ final class TrayModel: ObservableObject {
         openEditor = app.settings.afterCapture != "none"
         let types = NSPasteboard.general.types ?? []
         clipboardHasImage = types.contains(.png) || types.contains(.tiff) || types.contains(.fileURL)
+        update = UpdateChecker.shared.pending
     }
 }
 
@@ -296,7 +298,23 @@ struct TrayPanelView: View {
 
     private var clipBox: some View {
         Group {
-            if model.clipboardHasImage {
+            if let u = model.update {
+                Button { UpdateChecker.shared.showUpdateDialog(u) } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.down.circle.fill").font(.system(size: 16))
+                        Text(S.t("A SnapStudio \(u.version) está disponível", "SnapStudio \(u.version) is available"))
+                            .font(.system(size: 12.5, weight: .semibold))
+                        Spacer(minLength: 0)
+                        Text(S.t("Atualizar", "Update")).font(.system(size: 12.5, weight: .bold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Theme.accentColor))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            } else if model.clipboardHasImage {
                 HStack(spacing: 10) {
                     Image(systemName: "doc.on.clipboard").font(.system(size: 15))
                     Text(S.t("A última captura está na área de transferência — cole com ⌘V", "Your last capture is on the clipboard — paste with ⌘V"))
@@ -322,6 +340,12 @@ struct TrayPanelView: View {
             footerButton(S.t("Abrir imagem…", "Open image…")) { app.openImageDialog() }
             footerButton(S.t("Pasta", "Folder")) { app.openFolder() }
             Spacer()
+            Button { app.showSettings(tab: "about") } label: {
+                Text("v" + UpdateChecker.currentVersion).font(.system(size: 11.5)).foregroundStyle(Pal.muted)
+                    .padding(.horizontal, 6).frame(height: 36)
+            }
+            .buttonStyle(.plain)
+            .help(S.t("Versão e atualizações", "Version and updates"))
             footerButton(S.t("Sair", "Exit")) { NSApp.terminate(nil) }
         }
         .padding(.horizontal, 10)
@@ -385,10 +409,11 @@ struct ThumbTile: View {
             AppController.shared.openEditor(item.url, image: nil, compact: !item.isVideo)
         } label: {
             VStack(spacing: 0) {
-                ThumbView(url: item.url, size: 240)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                // a miniatura não pode influenciar o tamanho do cartão (capturas muito altas ou largas)
+                Pal.surface2
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .overlay(alignment: .top) { ThumbView(url: item.url, size: 240) }
                     .clipped()
-                    .background(Pal.surface2)
                 Rectangle().fill(Pal.border).frame(height: 1)
                 Text(RelTime.short(item.date))
                     .font(.system(size: 11.5)).foregroundStyle(Pal.muted).lineLimit(1)

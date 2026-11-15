@@ -13,7 +13,10 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         let compact = model.compact
         let win: NSWindow
         if compact {
-            win = QuickPanel(contentRect: .zero, styleMask: [.titled, .fullSizeContentView, .closable, .resizable], backing: .buffered, defer: false)
+            let qp = QuickPanel(contentRect: .zero, styleMask: [.titled, .fullSizeContentView, .closable, .resizable, .nonactivatingPanel], backing: .buffered, defer: false)
+            qp.becomesKeyOnlyIfNeeded = false
+            qp.hidesOnDeactivate = false
+            win = qp
             win.titlebarAppearsTransparent = true
             win.titleVisibility = .hidden
             win.standardWindowButton(.miniaturizeButton)?.isHidden = true
@@ -70,7 +73,9 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         AppController.shared.windowOpened(self)
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        if let c = model.canvas { window?.makeFirstResponder(c) }
+        // o editor rápido é um painel não ativante (recebe o teclado sem ativar a app); o completo ativa a app
+        if !model.compact { NSApp.activate() }
     }
 
     // ---------- fecho ----------
@@ -152,8 +157,11 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
     func toggleTheme() { AppController.shared.toggleTheme() }
 }
 
-final class QuickPanel: NSWindow {
+/// Editor rápido: painel "não ativante", para receber o teclado (Esc, texto, atalhos das ferramentas)
+/// logo depois de uma captura feita com um atalho global, sem ter de clicar nele primeiro.
+final class QuickPanel: NSPanel {
     override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 }
 
 // ================= vistas =================

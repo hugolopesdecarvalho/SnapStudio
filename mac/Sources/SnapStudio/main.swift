@@ -20,6 +20,11 @@ if args.count >= 3 && args[1] == "--readme-shots" {
     DemoShots.run(outDir: URL(fileURLWithPath: args[2]))
     exit(0)
 }
+// Teste: fotografa a janela das Definições em cada secção
+if args.count >= 3 && args[1] == "--settings-shots" {
+    DemoShots.settingsShots(outDir: URL(fileURLWithPath: args[2]), theme: args.count > 3 ? args[3] : "light")
+    exit(0)
+}
 // Modo de teste: desenha as janelas fora do ecrã (painel, editor, histórico, definições) para PNG
 if args.count >= 3 && args[1] == "--ui-snapshot" {
     SelfTest.uiSnapshots(outDir: URL(fileURLWithPath: args[2]), theme: args.count > 3 ? args[3] : "light")

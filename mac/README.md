@@ -52,8 +52,11 @@ Annotations stay editable when you reopen a capture (helper files in `~/Library/
 Thumbnail cards (images and videos) grouped by date, search (⌘F), filters (Today, This week, Annotated, Videos), hover actions (copy, edit, show in Finder, Trash), drag to other apps, context menu with *Rename…*. ⌫ moves the selected capture to the Trash.
 
 ## Settings
-General (open at login, clipboard, notifications, permission status), Appearance (light/dark/same as macOS theme, accent color), After capture, Shortcuts, Files (folder and PNG/JPG format), Video (15/30/60 fps, cursor). Changes apply immediately.
+A sidebar with General (open at login, permission status), Appearance (light/dark/same as macOS theme, accent color), After capture (what opens, clipboard, notifications), Shortcuts, Files (folder and PNG/JPG format), Video (15/30/60 fps, cursor) and About (version and updates). Changes apply immediately.
 User data in `~/Library/Application Support/SnapStudio`.
+
+## Updates
+SnapStudio checks the [releases page](https://github.com/hugolopesdecarvalho/SnapStudio/releases) shortly after launch and then once a day. When a newer version is published it shows a notification, a banner in the panel and a window with the release notes, with **Download**, **Later** and **Skip This Version**. You can also use *Check for Updates…* in the menu bar icon's right-click menu or in *Settings › About*, where automatic checks can be turned off. Only GitHub's public API is contacted; no personal data is sent.
 
 ## Build
 Only the Command Line Tools are needed (`xcode-select --install`); Xcode is not required.
@@ -87,4 +90,5 @@ $APP --make-ico ../assets/app.ico           # Windows icon, same design as the M
 | `VideoRecorder.swift`, `RecordingUI.swift` | `VideoRecorder.cs`, `RecordingUI.cs` | SCStream → AVAssetWriter (MP4/H.264), frame and bar |
 | `TrayPanel.swift`, `HistoryView.swift`, `SettingsView.swift` | `TrayPanel.cs`, `HistoryForm.cs`, `SettingsForm.cs` | panel, history, settings |
 | `HotKeys.swift` | `MessageWindow` | global shortcuts (Carbon, no Accessibility permission needed) |
+| `Updates.swift` | `Updates.cs` | version check against GitHub releases, update window |
 | `Settings.swift`, `Theme.swift`, `Strings.swift` | same | settings, theme, PT/EN strings |

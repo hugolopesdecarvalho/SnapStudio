@@ -57,6 +57,7 @@
 - **History** of captures and videos with thumbnails, search, filters and drag-and-drop to other apps.
 - **Light and dark themes**, accent colors, configurable shortcuts, PNG or JPG.
 - Interface in **English and Portuguese**, following the system language.
+- **Update notifications**: SnapStudio checks this repository's releases once a day and tells you when a new version is out (Settings › About shows your version; the check can be turned off). Only a request to GitHub's public API is made, no personal data is sent.
 
 ## Download and install
 Get the files from the [latest release](https://github.com/hugolopesdecarvalho/SnapStudio/releases/latest).
@@ -128,6 +129,11 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 ```bash
 cd mac && ./build.sh --install --run
 ```
+
+### Releasing a new version
+1. Bump the version in **both** places: `src/AssemblyInfo.cs` (Windows) and `VERSION` in `mac/build.sh` (macOS).
+2. Build `bin\SnapStudio.exe` on Windows and `SnapStudio-macOS.zip` on a Mac (`cd mac && ./build.sh`, then zip `build/SnapStudio.app` with `ditto -c -k --keepParent`).
+3. Create a GitHub release tagged `vX.Y.Z` with both files attached. The apps compare that tag with their own version to offer the update, and pick the `.exe` / `macOS` asset for the download button.
 
 ## Repository layout
 | Path | Contents |

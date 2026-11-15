@@ -81,6 +81,8 @@ namespace SnapStudio
         int visibleTiles;
         Size tileSize;
         bool clipVisible;
+        readonly ThemedLabel lblVersion;
+        RectangleF clipRect;
         DateTime lastHidden = DateTime.MinValue;
 
         static readonly Dictionary<string, Bitmap> thumbCache = new Dictionary<string, Bitmap>();
@@ -142,7 +144,11 @@ namespace SnapStudio
             btnExit = new FlatButton { Kind = BtnKind.Ghost, Text = S.T("Sair", "Exit") };
             btnExit.Size = new Size(btnExit.PreferredWidth, Px(36));
             btnExit.Click += delegate { HideNow(); TrayApp.Instance.Exit(); };
-            footer.Controls.AddRange(new Control[] { btnOpen, btnFolder, btnExit });
+            // versão no rodapé: abre Definições › Sobre
+            lblVersion = new ThemedLabel { Text = "v" + Updates.CurrentVersion, Font = Theme.Font(11.5f * dpi), Cursor = Cursors.Hand }.Muted();
+            lblVersion.Click += delegate { HideNow(); TrayApp.Instance.ShowSettings("about"); };
+            tips.SetToolTip(lblVersion, S.T("Versão e atualizações", "Version and updates"));
+            footer.Controls.AddRange(new Control[] { btnOpen, btnFolder, btnExit, lblVersion });
 
             Controls.AddRange(new Control[] { btnTheme, btnSettings, btnCapture, btnRecord, btnFull, btnWindow, btnDelay, btnHistory, swEditor, footer });
 
@@ -199,6 +205,7 @@ namespace SnapStudio
             btnOpen.Location = new Point(Px(10), Px(8));
             btnFolder.Location = new Point(btnOpen.Right + Px(4), Px(8));
             btnExit.Location = new Point(footer.Width - Px(10) - btnExit.Width, Px(8));
+            lblVersion.Location = new Point(btnExit.Left - Px(10) - lblVersion.Width, (footerH - lblVersion.Height) / 2);
             swEditor.Bounds = new Rectangle(Px(16), yLine2, W - 2 * Px(16), Px(44));
 
             // grelha de recentes: colunas pela largura, linhas pela altura disponível
@@ -352,6 +359,23 @@ namespace SnapStudio
             lastHidden = DateTime.Now;
         }
 
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            Cursor = Updates.Pending != null && clipRect.Contains(e.Location) ? Cursors.Hand : Cursors.Default;
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            var p = Updates.Pending;
+            if (e.Button == MouseButtons.Left && p != null && clipRect.Contains(e.Location))
+            {
+                HideNow();
+                UpdateForm.ShowFor(p);
+            }
+        }
+
         protected override void OnDeactivate(EventArgs e)
         {
             base.OnDeactivate(e);
@@ -458,7 +482,20 @@ namespace SnapStudio
             TextRenderer.DrawText(g, S.T("Recentes", "Recent"), Theme.Font(13 * dpi, FontStyle.Bold), new Rectangle(Px(16), yRecent, Px(200), Px(24)), Theme.Text, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
 
             var clip = new RectangleF(Px(14), yClip, W - Px(28), Px(44));
-            if (clipVisible)
+            clipRect = clip;
+            var upd = Updates.Pending;
+            if (upd != null)
+            {
+                // versão nova no GitHub: faixa de destaque (clicar abre a janela de atualização)
+                Theme.FillRound(g, Theme.Accent, clip, Px(8));
+                TextRenderer.DrawText(g, S.T("A SnapStudio ", "SnapStudio ") + upd.Version + S.T(" está disponível", " is available"),
+                    Theme.Font(12.5f * dpi, FontStyle.Bold), new Rectangle((int)clip.X + Px(14), (int)clip.Y, (int)clip.Width - Px(110), (int)clip.Height), Theme.OnAccent,
+                    TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
+                TextRenderer.DrawText(g, S.T("Atualizar", "Update"), Theme.Font(12.5f * dpi, FontStyle.Bold),
+                    new Rectangle((int)clip.X, (int)clip.Y, (int)clip.Width - Px(14), (int)clip.Height), Theme.OnAccent,
+                    TextFormatFlags.VerticalCenter | TextFormatFlags.Right | TextFormatFlags.NoPadding);
+            }
+            else if (clipVisible)
             {
                 Theme.FillRound(g, Theme.AccentSoft, clip, Px(8));
                 g.DrawImage(ToolIcons.Get("clipboard", Px(18), Theme.AccentSoftText), clip.X + Px(12), clip.Y + (clip.Height - Px(18)) / 2);

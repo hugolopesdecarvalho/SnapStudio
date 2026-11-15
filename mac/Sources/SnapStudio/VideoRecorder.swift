@@ -74,8 +74,8 @@ final class VideoRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
         let content = try await Capture.shareable()
         let did = Capture.displayID(screen)
         guard let display = content.displays.first(where: { $0.displayID == did }) else { throw CaptureError.noDisplay }
-        let me = content.applications.filter { $0.processID == getpid() }
-        let filter = SCContentFilter(display: display, excludingApplications: me, exceptingWindows: [])
+        // a moldura, a barra e a contagem não entram no vídeo; as outras janelas da SnapStudio sim
+        let filter = SCContentFilter(display: display, excludingWindows: Capture.ownTransientWindows(content))
 
         let cfg = SCStreamConfiguration()
         cfg.sourceRect = CGRect(x: area.minX, y: screen.frame.height - area.maxY, width: area.width, height: area.height)

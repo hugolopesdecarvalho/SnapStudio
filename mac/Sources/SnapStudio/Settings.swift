@@ -73,6 +73,9 @@ final class Settings: Codable {
     var editorFont: Int = 0
     var panelWidth: Int = 0                   // tamanho do painel da barra de menus (pontos; 0 = omissão)
     var panelHeight: Int = 0
+    var autoUpdateCheck = true                // procurar versões novas no GitHub (uma vez por dia)
+    var lastUpdateCheck: Double = 0           // segundos desde 1970
+    var skippedVersion: String = ""           // "Ignorar esta versão"
 
     var isNew = false
 
@@ -80,6 +83,7 @@ final class Settings: Codable {
         case outputFolder, format, copyToClipboard, showNotification, afterCapture, themeMode, accent
         case hotkeyRegion, hotkeyWindow, hotkeyFull, hotkeyRecord, videoFps, videoCursor
         case editorColor, editorWidth, editorFont, panelWidth, panelHeight
+        case autoUpdateCheck, lastUpdateCheck, skippedVersion
     }
 
     init() {}
@@ -106,6 +110,9 @@ final class Settings: Codable {
         editorFont = v(.editorFont, editorFont)
         panelWidth = v(.panelWidth, panelWidth)
         panelHeight = v(.panelHeight, panelHeight)
+        autoUpdateCheck = v(.autoUpdateCheck, autoUpdateCheck)
+        lastUpdateCheck = v(.lastUpdateCheck, lastUpdateCheck)
+        skippedVersion = v(.skippedVersion, skippedVersion)
     }
 
     static var defaultFolder: String {

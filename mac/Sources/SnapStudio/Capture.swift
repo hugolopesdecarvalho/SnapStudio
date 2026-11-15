@@ -78,15 +78,22 @@ enum Capture {
         try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
     }
 
+    /// Janelas temporárias da própria SnapStudio que nunca devem aparecer numa captura ou vídeo:
+    /// painel, ecrã de seleção, moldura/barra/contagem da gravação (todas acima do nível normal).
+    /// As janelas normais da app (editor, histórico, definições) aparecem, como as de qualquer outra app.
+    static func ownTransientWindows(_ content: SCShareableContent) -> [SCWindow] {
+        content.windows.filter { $0.owningApplication?.processID == getpid() && $0.windowLayer != 0 }
+    }
+
     /// Fotografa todos os ecrãs (sem as janelas da própria SnapStudio).
     static func snapshotScreens() async throws -> [ScreenShot] {
         let content = try await shareable()
-        let me = content.applications.filter { $0.processID == getpid() }
+        let hidden = ownTransientWindows(content)
         var out: [ScreenShot] = []
         for screen in NSScreen.screens {
             let did = displayID(screen)
             guard let d = content.displays.first(where: { $0.displayID == did }) else { continue }
-            let filter = SCContentFilter(display: d, excludingApplications: me, exceptingWindows: [])
+            let filter = SCContentFilter(display: d, excludingWindows: hidden)
             let cfg = SCStreamConfiguration()
             let scale = screen.backingScaleFactor
             cfg.width = Int(screen.frame.width * scale)
@@ -119,15 +126,14 @@ enum Capture {
         return g.makeImage()
     }
 
-    /// Janelas normais visíveis, da frente para trás.
+    /// Janelas normais visíveis (nível 0, incluindo as da própria SnapStudio), da frente para trás.
     static func visibleWindows() -> [WindowInfo] {
         guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return [] }
         let h0 = NSScreen.screens.first?.frame.height ?? 0
-        let me = getpid()
         var out: [WindowInfo] = []
         for w in list {
             guard (w[kCGWindowLayer as String] as? Int) == 0,
-                  let pid = w[kCGWindowOwnerPID as String] as? pid_t, pid != me,
+                  let pid = w[kCGWindowOwnerPID as String] as? pid_t,
                   let num = w[kCGWindowNumber as String] as? CGWindowID,
                   let bd = w[kCGWindowBounds as String] as? NSDictionary,
                   let r = CGRect(dictionaryRepresentation: bd) else { continue }

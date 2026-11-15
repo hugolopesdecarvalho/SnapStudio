@@ -82,6 +82,16 @@ enum SelfTest {
         let partial = try! JSONDecoder().decode(Settings.self, from: Data("{\"format\":\"jpg\"}".utf8))
         guard partial.format == "jpg", partial.videoFps == 30 else { print("FALHA: definições parciais"); return false }
 
+        // comparação de versões (atualizações)
+        let newer: [(String, String, Bool)] = [("1.2.0", "1.1.2", true), ("v1.1.10", "1.1.9", true), ("1.1.2", "1.1.2", false),
+                                               ("1.1", "1.1.0", false), ("1.0.9", "1.1.0", false), ("2.0.0-beta", "1.9.9", true), ("V1.2", "1.1.9", true)]
+        for (a, b, want) in newer where UpdateChecker.isNewer(a, than: b) != want {
+            print("FALHA: isNewer(\(a), \(b)) devia ser \(want)"); return false
+        }
+        guard UpdateChecker.plainNotes("## Title\n- **bold** and `code` [link](http://x)") == "Title\n• bold and code link" else {
+            print("FALHA: plainNotes → \(UpdateChecker.plainNotes("## Title\n- **bold** and `code` [link](http://x)"))"); return false
+        }
+
         print("OK — render \(out.width)x\(out.height), diferença média no esbatido = \(diff), atalho = \(back.hotkeyRegion.display)")
         return true
     }

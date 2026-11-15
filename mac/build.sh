@@ -10,7 +10,7 @@ cd "$(dirname "$0")"
 ROOT="$(pwd)"
 OUT="$ROOT/build"
 APP="$OUT/SnapStudio.app"
-VERSION="1.1.2"
+VERSION="1.2.0"
 
 RUN=0; INSTALL=0
 for a in "$@"; do

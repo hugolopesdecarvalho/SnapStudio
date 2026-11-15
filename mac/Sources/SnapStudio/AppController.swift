@@ -15,6 +15,8 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
     private(set) var recording: ScreenRecording?
     private var capturing = false
     private(set) var lastExternalApp: NSRunningApplication?
+    /// pid da app à frente no momento do pedido de captura, quando é a própria SnapStudio (editor, histórico…).
+    private var activeAppPidAtRequest: pid_t?
     private(set) var lastCopied = false
 
     var isRecording: Bool { recording != nil }
@@ -38,9 +40,11 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
         }
 
         panel = TrayPanelController()
-        // teste: abrir o painel logo ao arrancar
-        if CommandLine.arguments.contains("--show-panel") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in self?.togglePanel() }
+        // teste: abrir o painel ao arrancar (--show-panel [segundos])
+        let a = CommandLine.arguments
+        if let i = a.firstIndex(of: "--show-panel") {
+            let delay = i + 1 < a.count ? Double(a[i + 1]) ?? 0.8 : 0.8
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.togglePanel() }
         }
 
         lastExternalApp = NSWorkspace.shared.frontmostApplication
@@ -55,7 +59,14 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         }
 
+        // teste: --test-overlay-focus <ficheiro> — abre o modo captura com a app em segundo plano e regista
+        // se o ecrã de seleção recebe o teclado sem ativar a app (sem registar atalhos)
+        if let i = CommandLine.arguments.firstIndex(of: "--test-overlay-focus"), i + 1 < CommandLine.arguments.count {
+            runOverlayFocusTest(out: URL(fileURLWithPath: CommandLine.arguments[i + 1]))
+            return
+        }
         registerHotkeys(notify: true)
+        UpdateChecker.shared.start()
 
         if settings.isNew {
             settings.isNew = false
@@ -66,6 +77,29 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
                        "Press \(settings.hotkeyRegion.display) to enter capture mode, or click the icon in the menu bar."), path: nil, force: true)
             // pedir já a autorização de gravação do ecrã
             if !Capture.hasPermission { _ = CGRequestScreenCaptureAccess() }
+        }
+    }
+
+    private func runOverlayFocusTest(out: URL) {
+        var log = "frontmost-before=\(NSWorkspace.shared.frontmostApplication?.localizedName ?? "?") active-before=\(NSApp.isActive)\n"
+        startCapture(.region)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            let key = NSApp.keyWindow
+            log += "active-during=\(NSApp.isActive)\n"
+            log += "key-window=\(key.map { String(describing: type(of: $0)) } ?? "nil")\n"
+            log += "first-responder=\(key?.firstResponder.map { String(describing: type(of: $0)) } ?? "nil")\n"
+            // Esc simulado através do mesmo caminho que o teclado usa (keyDown da vista com o foco)
+            if let r = key?.firstResponder, let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                                                     windowNumber: key?.windowNumber ?? 0, context: nil, characters: "\u{1b}",
+                                                                     charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53) {
+                r.keyDown(with: e)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                log += "overlay-closed-after-esc=\(!NSApp.windows.contains { $0 is OverlayWindow && $0.isVisible })\n"
+                log += "capturing-after=\(self.capturing)\n"
+                try? log.write(to: out, atomically: true, encoding: .utf8)
+                exit(0)
+            }
         }
     }
 
@@ -167,6 +201,15 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
         login.state = Settings.startAtLogin ? .on : .off
         m.addItem(login)
         m.addItem(item(S.t("Definições…", "Settings…"), "gearshape") { [weak self] in self?.showSettings() })
+        if let u = UpdateChecker.shared.pending {
+            m.addItem(item(S.t("Atualizar para a versão \(u.version)…", "Update to version \(u.version)…"), "arrow.down.circle") {
+                UpdateChecker.shared.showUpdateDialog(u)
+            })
+        } else {
+            m.addItem(item(S.t("Procurar atualizações…", "Check for Updates…"), "arrow.triangle.2.circlepath") {
+                UpdateChecker.shared.check(interactive: true)
+            })
+        }
         m.addItem(.separator())
         m.addItem(item(S.t("Sair da SnapStudio", "Quit SnapStudio"), nil) { NSApp.terminate(nil) })
         return m
@@ -200,6 +243,7 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
 
         let appMenu = NSMenu()
         closure(appMenu, S.t("Acerca da SnapStudio", "About SnapStudio")) { NSApp.orderFrontStandardAboutPanel(nil); NSApp.activate(ignoringOtherApps: true) }
+        closure(appMenu, S.t("Procurar atualizações…", "Check for Updates…")) { UpdateChecker.shared.check(interactive: true) }
         appMenu.addItem(.separator())
         closure(appMenu, S.t("Definições…", "Settings…"), ",") { [weak self] in self?.showSettings() }
         appMenu.addItem(.separator())
@@ -275,6 +319,8 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
 
     func startCapture(_ mode: CaptureMode, delay: Double = 0) {
         if capturing || recording != nil { return }
+        let ownWindowInFront = NSApp.isActive && NSApp.windows.contains { $0.isVisible && $0.level == .normal && !($0 is NSPanel) }
+        activeAppPidAtRequest = ownWindowInFront ? getpid() : nil
         capturing = true
         // um pop-up aberto guarda e fecha-se antes de capturar
         for e in windows.compactMap({ $0 as? EditorWindowController }) where e.model.compact { e.saveAndClose() }
@@ -302,7 +348,8 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
                 img = Capture.compose(shots)
                 scale = shots.map { $0.scale }.max() ?? scale
             case .activeWindow:
-                img = try await Capture.captureActiveWindow(pid: lastExternalApp?.processIdentifier)
+                // se a SnapStudio estava à frente (editor, histórico…), é a janela dela que se captura
+                img = try await Capture.captureActiveWindow(pid: activeAppPidAtRequest ?? lastExternalApp?.processIdentifier)
             case .region:
                 let shots = try await Capture.snapshotScreens()
                 switch await select(shots) {
@@ -478,10 +525,14 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
         wc.show()
     }
 
-    func showSettings() {
+    func showSettings(tab: String? = nil) {
         closePanel()
+        if let t = tab {
+            SettingsStore.pendingTab = t
+            NotificationCenter.default.post(name: .snapShowSettingsTab, object: t)
+        }
         if let s = settingsWC { s.show(); return }
-        let wc = HostWindowController(title: S.t("Definições da SnapStudio", "SnapStudio Settings"), size: CGSize(width: 560, height: 430),
+        let wc = HostWindowController(title: S.t("Definições da SnapStudio", "SnapStudio Settings"), size: SettingsView.size,
                                       root: AnyView(SettingsView()), resizable: false, autosave: nil)
         settingsWC = wc
         wc.show()
@@ -513,6 +564,17 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: c, trigger: nil))
     }
 
+    /// Aviso de versão nova (notificação; sem notificações, abre logo o diálogo).
+    func notifyUpdate(_ r: ReleaseInfo) {
+        guard canNotify else { UpdateChecker.shared.showUpdateDialog(r); return }
+        let c = UNMutableNotificationContent()
+        c.title = S.t("Nova versão da SnapStudio", "New SnapStudio version")
+        c.body = S.t("A versão \(r.version) está disponível (tem a \(UpdateChecker.currentVersion)). Clique para ver.",
+                     "Version \(r.version) is available (you have \(UpdateChecker.currentVersion)). Click to see what's new.")
+        c.userInfo = ["update": r.version]
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "update-\(r.version)", content: c, trigger: nil))
+    }
+
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         completionHandler([.banner, .list])
@@ -520,7 +582,11 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
-        if let p = response.notification.request.content.userInfo["path"] as? String {
+        if response.notification.request.content.userInfo["update"] != nil {
+            DispatchQueue.main.async {
+                if let r = UpdateChecker.shared.available { UpdateChecker.shared.showUpdateDialog(r) }
+            }
+        } else if let p = response.notification.request.content.userInfo["path"] as? String {
             let u = URL(fileURLWithPath: p)
             DispatchQueue.main.async {
                 if FileManager.default.fileExists(atPath: p) { self.openEditor(u, image: nil, compact: !ImageUtil.isVideo(u)) }

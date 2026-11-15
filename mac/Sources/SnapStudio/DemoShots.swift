@@ -89,6 +89,27 @@ enum DemoShots {
         print("OK -> \(outDir.path)")
     }
 
+    /// `--settings-shots <pasta> [light|dark]`: fotografa a janela das Definições em cada secção.
+    static func settingsShots(outDir: URL, theme: String) {
+        NSApplication.shared.setActivationPolicy(.accessory)
+        try? FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
+        let st = AppController.shared.settings
+        st.themeMode = theme
+        Theme.apply(st)
+        func pump(_ s: Double) { RunLoop.main.run(until: Date().addingTimeInterval(s)) }
+        let wc = HostWindowController(title: S.t("Definições da SnapStudio", "SnapStudio Settings"), size: SettingsView.size,
+                                      root: AnyView(SettingsView()), resizable: false, autosave: nil)
+        wc.window?.center()
+        wc.window?.orderFrontRegardless()
+        pump(1.2)
+        for tab in ["general", "appearance", "after", "shortcuts", "files", "video", "about"] {
+            NotificationCenter.default.post(name: .snapShowSettingsTab, object: tab)
+            pump(0.8)
+            shoot(wc.window!, outDir.appendingPathComponent("settings-\(theme)-\(tab).png"))
+        }
+        wc.window?.orderOut(nil)
+    }
+
     private static func annotateDashboard(_ m: EditorModel) {
         func a(_ k: AnnKind, _ c: UInt32, _ f: (Ann) -> Void) { let x = Ann(kind: k, argb: c); f(x); m.add(x) }
         let red = ArgbColor.red, blue = ArgbColor.rgb(37, 99, 235)

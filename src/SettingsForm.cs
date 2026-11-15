@@ -52,10 +52,16 @@ namespace SnapStudio
         readonly TextBox txtFolder;
         readonly FlatButton fmtPng, fmtJpg;
         readonly List<TextBox> textBoxes = new List<TextBox>();
+        readonly ToggleRow tAutoUpdate;
+        readonly ThemedLabel lblUpdate;
+        readonly FlatButton btnCheck;
+        readonly int pageW;
 
         int Px(float v) { return (int)Math.Round(v * dpi); }
 
-        public SettingsForm(Settings settings)
+        public SettingsForm(Settings settings) : this(settings, null) { }
+
+        public SettingsForm(Settings settings, string startPage)
         {
             s = settings;
             dpi = Dpi.Scale;
@@ -94,6 +100,7 @@ namespace SnapStudio
             };
 
             int pw = Px(880 - 220 - 64);
+            pageW = pw;
 
             // Geral
             var pGeneral = Page(content, "general", S.T("Geral", "General"));
@@ -225,9 +232,47 @@ namespace SnapStudio
             tCursor = Toggle(pVideo, S.T("Mostrar o cursor do rato", "Show the mouse pointer"), null, s.VideoCursor, ref y, pw);
             pVideo.Controls.Add(new ThemedLabel { Text = S.T("Os vídeos são guardados em MP4 (H.264) na pasta das capturas, sem som.", "Videos are saved as MP4 (H.264) in the captures folder, without sound."), Font = Theme.Font(12.5f * dpi), Location = new Point(Px(32), y + Px(6)) }.Muted());
 
+            // Sobre: versão e atualizações
+            var pAbout = Page(content, "about", S.T("Sobre", "About"));
+            y = Px(84);
+            pAbout.Controls.Add(new PictureBox { Image = AppIcon.Draw(Px(56)), SizeMode = PictureBoxSizeMode.AutoSize, Location = new Point(Px(32), y), BackColor = Color.Transparent });
+            pAbout.Controls.Add(new ThemedLabel { Text = "SnapStudio", Font = Theme.Font(18 * dpi, FontStyle.Bold), Location = new Point(Px(102), y + Px(4)) });
+            pAbout.Controls.Add(new ThemedLabel { Text = S.T("Versão ", "Version ") + Updates.CurrentVersion, Font = Theme.Font(13.5f * dpi), Location = new Point(Px(102), y + Px(34)) }.Muted());
+            y += Px(88);
+            Section(pAbout, S.T("Atualizações", "Updates"), ref y);
+            lblUpdate = new ThemedLabel { AutoSize = false, Size = new Size(pw - Px(230), Px(38)), Location = new Point(Px(32), y), Font = Theme.Font(13 * dpi), TextAlign = ContentAlignment.MiddleLeft }.Muted();
+            btnCheck = new FlatButton { Kind = BtnKind.Secondary, Text = S.T("Procurar atualizações", "Check for updates") };
+            btnCheck.Size = new Size(btnCheck.PreferredWidth, Px(38));
+            btnCheck.Location = new Point(Px(32) + pw - btnCheck.Width, y);
+            btnCheck.Click += delegate
+            {
+                var p = Updates.Pending;
+                if (p != null) UpdateForm.ShowFor(p); else Updates.Check(true);
+            };
+            pAbout.Controls.Add(lblUpdate);
+            pAbout.Controls.Add(btnCheck);
+            y += Px(54);
+            tAutoUpdate = Toggle(pAbout, S.T("Procurar atualizações automaticamente", "Check for updates automatically"),
+                                 S.T("Uma vez por dia, na página de versões do GitHub. Não envia dados seus.", "Once a day, on the GitHub releases page. No personal data is sent."),
+                                 s.AutoUpdateCheck, ref y, pw);
+            y += Px(8);
+            var lnkRepo = new LinkLabel { AutoSize = true, Location = new Point(Px(32), y), Font = Theme.Font(13 * dpi), BackColor = Color.Transparent, Text = S.T("Página do projeto no GitHub", "Project page on GitHub") };
+            lnkRepo.LinkClicked += delegate { Updates.Open(Updates.RepoUrl); };
+            var lnkReleases = new LinkLabel { AutoSize = true, Location = new Point(Px(32), y + Px(30)), Font = Theme.Font(13 * dpi), BackColor = Color.Transparent, Text = S.T("Todas as versões", "All releases") };
+            lnkReleases.LinkClicked += delegate { Updates.Open(Updates.ReleasesUrl); };
+            foreach (var l in new[] { lnkRepo, lnkReleases })
+            {
+                var link = l;
+                link.LinkColor = Theme.Accent; link.ActiveLinkColor = Theme.Accent;
+                Theme.Changed += () => { if (!link.IsDisposed) { link.LinkColor = Theme.Accent; link.ActiveLinkColor = Theme.Accent; } };
+                pAbout.Controls.Add(link);
+            }
+            UpdateAboutStatus();
+            Updates.Changed += UpdateAboutStatus;
+
             // botões de navegação
             int ny = Px(70);
-            foreach (var kv in new[] { new[] { "general", S.T("Geral", "General") }, new[] { "look", S.T("Aparência", "Appearance") }, new[] { "after", S.T("Depois de capturar", "After capture") }, new[] { "keys", S.T("Atalhos", "Shortcuts") }, new[] { "files", S.T("Ficheiros", "Files") }, new[] { "video", S.T("Vídeo", "Video") } })
+            foreach (var kv in new[] { new[] { "general", S.T("Geral", "General") }, new[] { "look", S.T("Aparência", "Appearance") }, new[] { "after", S.T("Depois de capturar", "After capture") }, new[] { "keys", S.T("Atalhos", "Shortcuts") }, new[] { "files", S.T("Ficheiros", "Files") }, new[] { "video", S.T("Vídeo", "Video") }, new[] { "about", S.T("Sobre", "About") } })
             {
                 string key = kv[0];
                 var b = new FlatButton { Kind = BtnKind.Nav, Text = kv[1], Size = new Size(Px(196), Px(40)), Location = new Point(Px(12), ny), Font = Theme.Font(14 * dpi), Tag = key };
@@ -240,7 +285,7 @@ namespace SnapStudio
             Controls.Add(content);
             Controls.Add(footer);
             Controls.Add(nav);
-            ShowPage("general");
+            ShowPage(startPage != null && pages.ContainsKey(startPage) ? startPage : "general");
 
             Theme.Changed += ApplyTheme;
             ApplyTheme();
@@ -281,10 +326,27 @@ namespace SnapStudio
             return hb;
         }
 
-        void ShowPage(string key)
+        public void ShowPage(string key)
         {
+            if (!pages.ContainsKey(key)) return;
             foreach (var kv in pages) kv.Value.Visible = kv.Key == key;
             foreach (var b in navButtons) b.Checked = (string)b.Tag == key;
+        }
+
+        /// <summary>Texto e botão da secção Atualizações (página Sobre).</summary>
+        void UpdateAboutStatus()
+        {
+            if (IsDisposed || lblUpdate == null || btnCheck == null) return;
+            var p = Updates.Pending;
+            if (Updates.Checking) lblUpdate.Text = S.T("A procurar…", "Checking…");
+            else if (p != null) lblUpdate.Text = S.T("Está disponível a versão ", "Version ") + p.Version + S.T(".", " is available.");
+            else if (s.LastUpdateCheck > 0) lblUpdate.Text = S.T("Última verificação: ", "Last checked: ") + new DateTime(s.LastUpdateCheck, DateTimeKind.Utc).ToLocalTime().ToString("g");
+            else lblUpdate.Text = S.T("Ainda não foi verificado.", "Not checked yet.");
+            btnCheck.Kind = p != null ? BtnKind.Primary : BtnKind.Secondary;
+            btnCheck.Text = p != null ? S.T("Ver e descarregar…", "View and download…") : S.T("Procurar atualizações", "Check for updates");
+            btnCheck.Size = new Size(btnCheck.PreferredWidth, Px(38));
+            btnCheck.Left = Px(32) + pageW - btnCheck.Width;
+            btnCheck.Enabled = !Updates.Checking;
         }
 
         void SetAccent(string name)
@@ -338,6 +400,7 @@ namespace SnapStudio
             s.HotkeyRecord = hkRecord.Value;
             foreach (var fb in fpsButtons) if (fb.Checked) s.VideoFps = (int)fb.Tag;
             s.VideoCursor = tCursor.Checked;
+            s.AutoUpdateCheck = tAutoUpdate.Checked;
             s.ThemeMode = theme;
             s.Accent = accent;
             try { Settings.StartWithWindows = tStartup.Checked; } catch { }
@@ -353,6 +416,7 @@ namespace SnapStudio
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             Theme.Changed -= ApplyTheme;
+            Updates.Changed -= UpdateAboutStatus;
             // cancelado: repor o tema original
             if (DialogResult != DialogResult.OK && (theme != origTheme || accent != origAccent))
                 Theme.Configure(origTheme, origAccent);
