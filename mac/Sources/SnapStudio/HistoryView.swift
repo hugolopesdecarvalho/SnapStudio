@@ -247,7 +247,6 @@ struct HistoryCard: View {
         .onDrag { NSItemProvider(contentsOf: item.url) ?? NSItemProvider() }
         .contextMenu {
             Button(item.isVideo ? S.t("Reproduzir", "Play") : S.t("Abrir no editor", "Open in editor"), action: onOpen)
-            if !item.isVideo { Button(S.t("Abrir no editor rápido", "Open in quick editor")) { AppController.shared.openEditor(item.url, image: nil, compact: true) } }
             Button(S.t("Copiar", "Copy"), action: onCopy)
             Button(S.t("Mostrar no Finder", "Show in Finder"), action: onReveal)
             Button(S.t("Mudar o nome…", "Rename…"), action: onRename)

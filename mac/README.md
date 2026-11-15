@@ -35,7 +35,7 @@ Macs have no PrtScn key. The default shortcuts avoid the system ones (⌘⇧3/4/
 | ⌃⇧5 | Record screen video (start / stop) |
 
 After a capture, the image is saved to `Pictures/SnapStudio`, **copied to the clipboard** (⌘V in any app) and, depending on Settings, opened in:
-- **Quick editor** (pop-up below the menu bar): arrow, box, text, blur, steps, crop; *Copy and close* (⌘↩). Esc or clicking outside saves and closes.
+- **Quick editor** (pop-up below the menu bar): select, arrow, box, text, blur, steps, crop; *Copy and close* (⌘↩). Esc or clicking outside saves and closes. Only used right after a capture: captures opened from the panel, history or a notification open in the full editor.
 - **Full editor**: all tools, properties (color, width, text size) and the annotation list.
 - **Nothing**: just save and copy, with a notification. Clicking the notification opens the editor.
 
@@ -45,7 +45,7 @@ The video is saved as MP4 (H.264) and copied as a file (⌘V in Finder, Mail, Te
 
 ## Editor
 Select (V), Arrow (A), Box (R), Text (T), **Blur** (B) and Pixelate (X) to hide areas, Highlighter (H), Step number (N), Ellipse (E), Line (L), Freehand (P), Crop (C).
-⌘S save · ⇧⌘S save as · ⌘C copy · ⌘Z/⇧⌘Z undo/redo · ⌫ deletes · arrow keys move (⇧ = 10 px) · ⇧ while drawing = 45° angles/squares · pinch or ⌘+wheel = zoom · ⌘9 fit · ⌘0 actual size · *Drag* button to drop the image into another app.
+⌘S save · ⇧⌘S save as · ⌘C copy · ⌘Z/⇧⌘Z undo/redo · ⌫ deletes · arrow keys move (⇧ = 10 px) · ⇧ while drawing = 45° angles/squares · pinch or ⌘+wheel = zoom · ⌘9 fit · ⌘0 actual size · ⌘← / ⌘→ (or ‹ › in the header) previous / next capture in the folder, saving changes first · *Drag* button to drop the image into another app.
 After placing an annotation the editor returns to Select (V) with it selected; numbered steps and freehand stay active. The full editor's properties panel shows only what applies to the selected annotation or active tool: color, width, text size, text *Outline* (auto/white/black/none), *Fill* with opacity (boxes, ellipses), *Rounded corners* with a radius (boxes, highlighter, blur, pixelate) and *Rounded tip* (arrows).
 Annotations stay editable when you reopen a capture (helper files in `~/Library/Application Support/SnapStudio/edit`).
 

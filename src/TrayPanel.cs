@@ -219,7 +219,7 @@ namespace SnapStudio
             while (tiles.Count < count)
             {
                 var t = new ThumbTile();
-                t.Click += delegate { if (t.Path != null) { HideNow(); TrayApp.Instance.OpenQuickEditor(t.Path, null); } };
+                t.Click += delegate { if (t.Path != null) { HideNow(); TrayApp.Instance.OpenEditor(t.Path, null); } };
                 tiles.Add(t);
                 Controls.Add(t);
             }

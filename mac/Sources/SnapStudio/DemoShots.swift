@@ -89,6 +89,50 @@ enum DemoShots {
         print("OK -> \(outDir.path)")
     }
 
+    /// `--nav-test <pasta>`: testa imagem anterior/seguinte no editor completo, com 3 capturas fictícias.
+    static func navTest(outDir: URL) -> Bool {
+        NSApplication.shared.setActivationPolicy(.accessory)
+        let fm = FileManager.default
+        try? fm.createDirectory(at: outDir, withIntermediateDirectories: true)
+        let dir = fm.temporaryDirectory.appendingPathComponent("SnapStudioNav-\(getpid())")
+        try? fm.removeItem(at: dir); try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { for u in (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [] { Sidecar.delete(u) }; try? fm.removeItem(at: dir) }
+        let arts = [DemoArt.login(), DemoArt.dashboard(), DemoArt.code()]
+        var urls: [URL] = []
+        for (i, a) in arts.enumerated() {
+            let u = dir.appendingPathComponent("capture-\(i + 1).png")
+            try? ImageUtil.save(a, to: u)
+            let d = Date().addingTimeInterval(TimeInterval(-3600 * (3 - i)))   // 1 é a mais antiga
+            try? fm.setAttributes([.creationDate: d, .modificationDate: d], ofItemAtPath: u.path)
+            urls.append(u)
+        }
+        func pump(_ s: Double) { RunLoop.main.run(until: Date().addingTimeInterval(s)) }
+        guard let m = try? EditorModel(url: urls[1], initial: nil, compact: false) else { return false }
+        let wc = EditorWindowController(model: m)
+        wc.window?.setContentSize(CGSize(width: 1180, height: 760)); wc.window?.center(); wc.window?.orderFrontRegardless()
+        pump(1.2)
+        var ok = true
+        func check(_ c: Bool, _ msg: String) { if !c { print("FALHA: \(msg)"); ok = false } }
+        check(wc.position?.index == 2 && wc.position?.count == 3, "posição inicial \(String(describing: wc.position))")
+        check(wc.canNavigate(-1) && wc.canNavigate(1), "pode navegar nos dois sentidos")
+        shoot(wc.window!, outDir.appendingPathComponent("nav-2of3.png"))
+        wc.navigate(1); pump(0.8)
+        check(wc.model.fileURL.lastPathComponent == "capture-3.png", "seguinte → \(wc.model.fileURL.lastPathComponent)")
+        check(wc.position?.index == 3 && !wc.canNavigate(1), "última sem seguinte")
+        // anotar e recuar: a alteração é guardada antes de mudar
+        let a = Ann(kind: .rect, argb: ArgbColor.red); a.p1 = CGPoint(x: 100, y: 100); a.p2 = CGPoint(x: 400, y: 300)
+        wc.model.add(a)
+        wc.navigate(-1); pump(0.8)
+        check(wc.model.fileURL.lastPathComponent == "capture-2.png", "anterior → \(wc.model.fileURL.lastPathComponent)")
+        check(Sidecar.hasAnnotations(urls[2]), "anotação da 3.ª guardada ao mudar")
+        wc.navigate(-1); pump(0.8)
+        check(wc.position?.index == 1 && !wc.canNavigate(-1), "primeira sem anterior")
+        shoot(wc.window!, outDir.appendingPathComponent("nav-1of3.png"))
+        wc.window?.orderOut(nil)
+        print(ok ? "OK — anterior/seguinte" : "FALHAS")
+        return ok
+    }
+
     /// `--props-shots <pasta>`: fotografa o painel de propriedades do editor com várias ferramentas/seleções.
     static func propsShots(outDir: URL) {
         NSApplication.shared.setActivationPolicy(.accessory)

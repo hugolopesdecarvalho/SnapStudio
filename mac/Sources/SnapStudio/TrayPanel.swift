@@ -406,7 +406,7 @@ struct ThumbTile: View {
 
     var body: some View {
         Button {
-            AppController.shared.openEditor(item.url, image: nil, compact: !item.isVideo)
+            AppController.shared.openEditor(item.url, image: nil, compact: false)
         } label: {
             VStack(spacing: 0) {
                 // a miniatura não pode influenciar o tamanho do cartão (capturas muito altas ou largas)

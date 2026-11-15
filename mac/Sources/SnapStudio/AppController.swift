@@ -283,6 +283,9 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
         add(view, S.t("Reduzir", "Zoom Out"), #selector(CanvasView.zoomOut(_:)), "-")
         add(view, S.t("Ajustar à janela", "Zoom to Fit"), #selector(CanvasView.zoomToFit(_:)), "9")
         add(view, S.t("Tamanho real", "Actual Size"), #selector(CanvasView.zoomActualSize(_:)), "0")
+        view.addItem(.separator())
+        add(view, S.t("Imagem anterior", "Previous Image"), #selector(CanvasView.previousImage(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!))
+        add(view, S.t("Imagem seguinte", "Next Image"), #selector(CanvasView.nextImage(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!))
         let viewItem = NSMenuItem(); viewItem.submenu = view; main.addItem(viewItem)
 
         let win = NSMenu(title: S.t("Janela", "Window"))
@@ -589,7 +592,7 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
         } else if let p = response.notification.request.content.userInfo["path"] as? String {
             let u = URL(fileURLWithPath: p)
             DispatchQueue.main.async {
-                if FileManager.default.fileExists(atPath: p) { self.openEditor(u, image: nil, compact: !ImageUtil.isVideo(u)) }
+                if FileManager.default.fileExists(atPath: p) { self.openEditor(u, image: nil, compact: false) }
             }
         }
         completionHandler()

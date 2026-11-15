@@ -665,7 +665,6 @@ namespace SnapStudio
             var m = new ContextMenuStrip { Renderer = new ThemedRenderer(), Font = Theme.Font(13 * dpi) };
             var open = m.Items.Add(S.T("Abrir no editor", "Open in editor"), null, delegate { OpenSelected(); });
             open.Font = Theme.Font(13 * dpi, FontStyle.Bold);
-            m.Items.Add(S.T("Abrir no editor rápido", "Open in quick editor"), null, delegate { var s = SelectedPaths(); if (s.Count > 0) TrayApp.Instance.OpenQuickEditor(s[0], null); });
             m.Items.Add(S.T("Copiar", "Copy"), null, delegate { CopyPaths(SelectedPaths()); });
             m.Items.Add(S.T("Mostrar na pasta", "Show in folder"), null, delegate { ShowInFolder(); });
             m.Items.Add(new ToolStripSeparator());

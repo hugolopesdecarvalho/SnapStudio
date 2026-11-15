@@ -79,6 +79,10 @@ namespace SnapStudio
             public void Add(Control c, int dy) { Items.Add(c); Dy.Add(dy); }
         }
         readonly List<PropGroup> propGroups = new List<PropGroup>();
+        // imagem anterior / seguinte (capturas da mesma pasta, da mais antiga para a mais recente)
+        List<string> siblings = new List<string>();
+        FlatButton btnPrev, btnNext;
+        ThemedLabel lblNav;
         readonly List<FlatButton> outlineButtons = new List<FlatButton>();
         ThemedPanel propsPanel;
         ThemedLabel lblPropsHint, lblLayersTitle, lblFillVal;
@@ -146,6 +150,81 @@ namespace SnapStudio
             UpdateUndoButtons();
             RefreshLayers();
             SyncSliders();
+            if (!compact) { ReloadSiblings(); UpdateNav(); }
+        }
+
+        // ================= imagem anterior / seguinte =================
+
+        void ReloadSiblings()
+        {
+            siblings = new List<string>();
+            try
+            {
+                string dir = Path.GetDirectoryName(filePath);
+                if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
+                string[] exts = { ".png", ".jpg", ".jpeg", ".bmp", ".gif" };
+                var files = new List<FileInfo>();
+                foreach (var f in new DirectoryInfo(dir).GetFiles())
+                    if (Array.IndexOf(exts, f.Extension.ToLowerInvariant()) >= 0) files.Add(f);
+                files.Sort((a, b) => a.CreationTime.CompareTo(b.CreationTime));
+                foreach (var f in files) siblings.Add(f.FullName);
+            }
+            catch { }
+        }
+
+        int SiblingIndex()
+        {
+            for (int i = 0; i < siblings.Count; i++)
+                if (string.Equals(siblings[i], filePath, StringComparison.OrdinalIgnoreCase)) return i;
+            return -1;
+        }
+
+        void UpdateNav()
+        {
+            if (btnPrev == null) return;
+            int i = SiblingIndex();
+            bool show = i >= 0 && siblings.Count > 1;
+            btnPrev.Visible = btnNext.Visible = lblNav.Visible = show;
+            if (!show) return;
+            lblNav.Text = (i + 1) + " / " + siblings.Count;
+            btnPrev.Enabled = i > 0;
+            btnNext.Enabled = i < siblings.Count - 1;
+        }
+
+        /// <summary>Abre a imagem anterior (-1) ou seguinte (+1) nesta janela; as alterações são guardadas antes.</summary>
+        void Navigate(int delta)
+        {
+            if (compact) return;
+            CommitText();
+            ReloadSiblings();
+            int i = SiblingIndex(), t = i + delta;
+            if (i < 0 || t < 0 || t >= siblings.Count) { System.Media.SystemSounds.Beep.Play(); return; }
+            if (modified && !Save()) return;
+            string target = siblings[t];
+            try
+            {
+                anns = new List<Ann>();
+                LoadImage(target, null);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, S.T("Não foi possível abrir a imagem: ", "Could not open the image: ") + ex.Message, "SnapStudio", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LoadImage(filePath, null);
+                return;
+            }
+            filePath = target;
+            undo.Clear(); redo.Clear();
+            selected = null; live = null; editingText = null; pendingUndo = null;
+            drag = Drag.None; cropRect = RectangleF.Empty;
+            modified = false;
+            ZoomFit();
+            Dirty();
+            UpdateTitle();
+            UpdateStatus();
+            UpdateUndoButtons();
+            RefreshLayers();
+            SelectionChanged();
+            UpdateNav();
         }
 
         // ================= carregamento =================
@@ -339,6 +418,12 @@ namespace SnapStudio
             btnUndo = Btn(header, BtnKind.Ghost, "undo", null, S.T("Anular (Ctrl+Z)", "Undo (Ctrl+Z)"), delegate { Undo(); });
             btnRedo = Btn(header, BtnKind.Ghost, "redo", null, S.T("Refazer (Ctrl+Y)", "Redo (Ctrl+Y)"), delegate { Redo(); });
             btnUndo.Size = btnRedo.Size = new Size(Px(40), Px(40));
+            btnPrev = Btn(header, BtnKind.Ghost, null, "‹", S.T("Imagem anterior (Ctrl+←)", "Previous image (Ctrl+←)"), delegate { Navigate(-1); });
+            btnNext = Btn(header, BtnKind.Ghost, null, "›", S.T("Imagem seguinte (Ctrl+→)", "Next image (Ctrl+→)"), delegate { Navigate(1); });
+            btnPrev.Font = btnNext.Font = Theme.Font(20 * dpi);
+            btnPrev.Size = btnNext.Size = new Size(Px(36), Px(40));
+            lblNav = new ThemedLabel { Font = Theme.Font(12.5f * dpi), AutoSize = false, TextAlign = ContentAlignment.MiddleCenter, Size = new Size(Px(64), Px(40)) }.Muted();
+            header.Controls.Add(lblNav);
             var btnCopy = Btn(header, BtnKind.Primary, "copy", S.T("Copiar", "Copy"), S.T("Copiar imagem (Ctrl+C)", "Copy image (Ctrl+C)"), delegate { CopyToClipboard(true); });
             var btnSaveAs = Btn(header, BtnKind.Secondary, null, S.T("Guardar como…", "Save as…"), S.T("Guardar como (Ctrl+Shift+S)", "Save as (Ctrl+Shift+S)"), delegate { SaveAs(); });
             var btnSave = Btn(header, BtnKind.Secondary, "save", S.T("Guardar", "Save"), S.T("Guardar (Ctrl+S)", "Save (Ctrl+S)"), delegate { Save(); });
@@ -353,6 +438,9 @@ namespace SnapStudio
                 int x0 = Px(52) + Math.Max(lblFile.Width, lblStatus.Width) + Px(20);
                 btnUndo.Location = new Point(x0, Px(8));
                 btnRedo.Location = new Point(x0 + Px(42), Px(8));
+                btnPrev.Location = new Point(x0 + Px(98), Px(8));
+                lblNav.Location = new Point(btnPrev.Right, Px(8));
+                btnNext.Location = new Point(lblNav.Right, Px(8));
                 int x = header.Width - Px(12);
                 foreach (var b in new[] { btnCopy, btnSaveAs, btnSave, btnDrag })
                 {
@@ -1884,6 +1972,8 @@ namespace SnapStudio
                 case Keys.Control | Keys.D0:
                 case Keys.Control | Keys.NumPad0: SetZoom(1f); return true;
                 case Keys.Control | Keys.D9: ZoomFit(); return true;
+                case Keys.Control | Keys.Left: if (!compact) { Navigate(-1); return true; } break;
+                case Keys.Control | Keys.Right: if (!compact) { Navigate(1); return true; } break;
                 case Keys.Left: case Keys.Shift | Keys.Left: Nudge(-step, 0); return true;
                 case Keys.Right: case Keys.Shift | Keys.Right: Nudge(step, 0); return true;
                 case Keys.Up: case Keys.Shift | Keys.Up: Nudge(0, -step); return true;

@@ -4,9 +4,12 @@ import SwiftUI
 // ================= janela =================
 
 final class EditorWindowController: NSWindowController, NSWindowDelegate {
-    let model: EditorModel
+    private(set) var model: EditorModel
     private var closing = false
     private var quietClose = false
+    /// Imagens da mesma pasta, da mais antiga para a mais recente (para anterior/seguinte).
+    private var siblings: [URL] = []
+    private var capturesToken: NSObjectProtocol?
 
     init(model: EditorModel) {
         self.model = model
@@ -36,8 +39,57 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         updateTitle()
         model.onClose = { [weak self] in self?.window?.close() }
         layout()
+        if !compact {
+            reloadSiblings()
+            capturesToken = NotificationCenter.default.addObserver(forName: .snapCapturesChanged, object: nil, queue: .main) { [weak self] _ in
+                self?.reloadSiblings()
+            }
+        }
     }
     required init?(coder: NSCoder) { fatalError() }
+    deinit { if let t = capturesToken { NotificationCenter.default.removeObserver(t) } }
+
+    // ---------- imagem anterior / seguinte ----------
+
+    private func reloadSiblings() {
+        let folder = model.fileURL.deletingLastPathComponent()
+        siblings = CaptureItem.scan(folder).filter { !$0.isVideo }.map { $0.url }.reversed()
+    }
+
+    /// Posição da imagem atual entre as da pasta (1-based), ou nil se não estiver na lista.
+    var position: (index: Int, count: Int)? {
+        let cur = model.fileURL.standardizedFileURL.path
+        guard let i = siblings.firstIndex(where: { $0.standardizedFileURL.path == cur }) else { return nil }
+        return (i + 1, siblings.count)
+    }
+
+    func canNavigate(_ delta: Int) -> Bool {
+        guard let p = position else { return false }
+        let t = p.index - 1 + delta
+        return t >= 0 && t < p.count
+    }
+
+    /// Abre a imagem anterior (-1) ou seguinte (+1) na mesma janela; as alterações são guardadas antes.
+    func navigate(_ delta: Int) {
+        guard !model.compact, let p = position else { return }
+        let t = p.index - 1 + delta
+        guard t >= 0 && t < siblings.count else { NSSound.beep(); return }
+        model.canvas?.commitText()
+        if model.modified && !model.save() { return }
+        model.rememberStyle()
+        let target = siblings[t]
+        guard let m = try? EditorModel(url: target, initial: nil, compact: false) else {
+            AppController.shared.showError(S.t("Não foi possível abrir a imagem: ", "Could not open the image: ") + target.lastPathComponent)
+            return
+        }
+        model = m
+        m.onClose = { [weak self] in self?.window?.close() }
+        window?.contentView = NSHostingView(rootView: EditorRoot(model: m, controller: self))
+        updateTitle()
+        DispatchQueue.main.async { [weak self] in
+            if let c = self?.model.canvas { self?.window?.makeFirstResponder(c) }
+        }
+    }
 
     func updateTitle() {
         window?.title = model.title
@@ -225,6 +277,23 @@ struct Swatch: View {
     }
 }
 
+/// Linha de propriedade com interruptor: título à esquerda, interruptor encostado à direita.
+struct PropToggle: View {
+    let title: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        HStack {
+            Text(title).font(.subheadline).foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).controlSize(.small)
+        }
+        .frame(height: 22)
+        .contentShape(Rectangle())
+        .onTapGesture { isOn.toggle() }
+    }
+}
+
 /// Botão "Arrastar": arrasta o ficheiro guardado para o Finder, Mail, Teams…
 struct DragHandle: View {
     @ObservedObject var model: EditorModel
@@ -269,6 +338,16 @@ struct FullEditorView: View {
         HStack(spacing: 6) {
             IconButton(symbol: "arrow.uturn.backward", help: S.t("Anular (⌘Z)", "Undo (⌘Z)")) { model.undo() }.disabled(!model.canUndo)
             IconButton(symbol: "arrow.uturn.forward", help: S.t("Refazer (⇧⌘Z)", "Redo (⇧⌘Z)")) { model.redo() }.disabled(!model.canRedo)
+            Divider().frame(height: 20).padding(.horizontal, 6)
+            IconButton(symbol: "chevron.left", help: S.t("Imagem anterior (⌘←)", "Previous image (⌘←)")) { controller.navigate(-1) }
+                .disabled(!controller.canNavigate(-1))
+            if let p = controller.position {
+                Text("\(p.index) / \(p.count)").font(.callout).monospacedDigit().foregroundStyle(.secondary)
+                    .frame(minWidth: 44)
+                    .help(S.t("Posição entre as capturas da pasta", "Position among the captures in the folder"))
+            }
+            IconButton(symbol: "chevron.right", help: S.t("Imagem seguinte (⌘→)", "Next image (⌘→)")) { controller.navigate(1) }
+                .disabled(!controller.canNavigate(1))
             Spacer()
             DragHandle(model: model)
             Button(S.t("Guardar como…", "Save as…")) { controller.saveAs() }
@@ -348,12 +427,13 @@ struct FullEditorView: View {
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
+                    .controlSize(.small)
+                    .frame(width: 222, alignment: .leading)
                 }
             }
             if k?.usesFill == true {
                 VStack(alignment: .leading, spacing: 4) {
-                    Toggle(S.t("Preencher", "Fill"), isOn: Binding(get: { model.fillOn }, set: { model.setFill($0) }))
-                        .toggleStyle(.switch).controlSize(.small)
+                    PropToggle(title: S.t("Preencher", "Fill"), isOn: Binding(get: { model.fillOn }, set: { model.setFill($0) }))
                     if model.fillOn {
                         HStack { Text(S.t("Opacidade", "Opacity")).font(.subheadline).foregroundStyle(.secondary); Spacer(); Text("\(Int((model.fillOpacity * 100).rounded()))%").monospacedDigit() }
                         Slider(value: Binding(get: { model.fillOpacity * 100 }, set: { model.setFillOpacity(($0 / 5).rounded() * 5 / 100) }), in: 10...100)
@@ -362,9 +442,8 @@ struct FullEditorView: View {
             }
             if k?.usesRounded == true {
                 VStack(alignment: .leading, spacing: 4) {
-                    Toggle(k == .arrow ? S.t("Ponta arredondada", "Rounded tip") : S.t("Cantos arredondados", "Rounded corners"),
-                           isOn: Binding(get: { model.rounded }, set: { model.setRounded($0) }))
-                        .toggleStyle(.switch).controlSize(.small)
+                    PropToggle(title: k == .arrow ? S.t("Ponta arredondada", "Rounded tip") : S.t("Cantos arredondados", "Rounded corners"),
+                               isOn: Binding(get: { model.rounded }, set: { model.setRounded($0) }))
                     if k?.usesRadius == true && model.rounded {
                         HStack { Text(S.t("Raio", "Radius")).font(.subheadline).foregroundStyle(.secondary); Spacer(); Text("\(Int(model.radius)) px").monospacedDigit() }
                         Slider(value: Binding(get: { model.radius }, set: { model.setRadius($0.rounded()) }), in: 2...40)
@@ -397,6 +476,8 @@ struct FullEditorView: View {
             }
             .id(model.revision)
         }
+        // largura fixa: nenhum controlo pode alargar a coluna e deslocar o resto
+        .frame(width: 222, alignment: .topLeading)
         .padding(14)
     }
 

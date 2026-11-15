@@ -20,6 +20,10 @@ if args.count >= 3 && args[1] == "--readme-shots" {
     DemoShots.run(outDir: URL(fileURLWithPath: args[2]))
     exit(0)
 }
+// Teste: imagem anterior/seguinte no editor
+if args.count >= 3 && args[1] == "--nav-test" {
+    exit(DemoShots.navTest(outDir: URL(fileURLWithPath: args[2])) ? 0 : 1)
+}
 // Teste: fotografa o painel de propriedades do editor em vários casos
 if args.count >= 3 && args[1] == "--props-shots" {
     DemoShots.propsShots(outDir: URL(fileURLWithPath: args[2]))

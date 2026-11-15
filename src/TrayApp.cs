@@ -106,7 +106,7 @@ namespace SnapStudio
             tray.BalloonTipClicked += delegate
             {
                 if (lastBalloonIsUpdate) { if (Updates.Available != null) UpdateForm.ShowFor(Updates.Available); return; }
-                if (lastBalloonPath != null && File.Exists(lastBalloonPath)) OpenQuickEditor(lastBalloonPath, null);
+                if (lastBalloonPath != null && File.Exists(lastBalloonPath)) OpenEditor(lastBalloonPath, null);
             };
 
             msg = new MessageWindow();

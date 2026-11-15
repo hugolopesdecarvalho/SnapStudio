@@ -93,7 +93,7 @@ In capture mode: click a window, drag a region, **Enter** = full screen, **A** =
 
 ### After a capture
 The image is saved to `Pictures/SnapStudio` and copied to the clipboard. Depending on *Settings › After capture*, it then opens in:
-- **Quick editor**: a pop-up next to the tray / menu bar with the most-used tools and *Copy and close*. Esc or clicking outside saves and closes.
+- **Quick editor**: a pop-up next to the tray / menu bar with the most-used tools and *Copy and close*. Esc or clicking outside saves and closes. It is only used right after a capture; opening a capture from the panel, the history or a notification always uses the full editor.
 - **Full editor**: all tools, properties (color, width, text size) and the annotation list.
 - **Nothing**: just save and copy, with a notification.
 
@@ -109,6 +109,8 @@ Tool keys (same on both platforms): Select (V), Arrow (A), Box (R), Text (T), **
 | Zoom | Ctrl+wheel | pinch or ⌘+wheel |
 
 Hold Shift while drawing for 45° angles and squares. Use the **Drag** button to drop the image straight into another app.
+
+Use **‹ ›** in the full editor's header, or Ctrl+← / Ctrl+→ on Windows and ⌘← / ⌘→ on macOS, to move to the previous or next capture in the same folder, oldest to newest. Changes are saved before switching.
 
 After you place an annotation, the editor switches back to **Select** with it selected, so you can move or adjust it right away (numbered steps and freehand stay active to place several in a row). The full editor's properties panel only shows what applies to the selected annotation (or to the active tool):
 - **Rounded corners** with an adjustable radius for boxes, the highlighter, blur and pixelate, and a rounded tip for arrows.

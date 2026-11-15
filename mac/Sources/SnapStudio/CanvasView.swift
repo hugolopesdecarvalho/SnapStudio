@@ -314,12 +314,16 @@ final class CanvasView: NSView, NSTextViewDelegate, NSMenuItemValidation {
     @objc func zoomOut(_ sender: Any?) { zoom(by: 1 / 1.25, at: nil) }
     @objc func zoomToFit(_ sender: Any?) { zoomFit() }
     @objc func zoomActualSize(_ sender: Any?) { setZoom(1, at: nil) }
+    @objc func previousImage(_ sender: Any?) { (window?.windowController as? EditorWindowController)?.navigate(-1) }
+    @objc func nextImage(_ sender: Any?) { (window?.windowController as? EditorWindowController)?.navigate(1) }
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         switch item.action {
         case #selector(undo(_:)): return model.canUndo
         case #selector(redo(_:)): return model.canRedo
         case #selector(delete(_:)): return model.selected != nil
+        case #selector(previousImage(_:)): return (window?.windowController as? EditorWindowController)?.canNavigate(-1) ?? false
+        case #selector(nextImage(_:)): return (window?.windowController as? EditorWindowController)?.canNavigate(1) ?? false
         default: return true
         }
     }
