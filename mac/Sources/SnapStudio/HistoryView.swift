@@ -82,6 +82,32 @@ final class HistoryModel: ObservableObject {
         }
     }
 
+    // ---------- seleção com o rato (retângulo) ----------
+
+    /// Posição de cada cartão no conteúdo da lista (espaço "history").
+    var cardFrames: [URL: CGRect] = [:]
+    /// Retângulo de seleção a ser arrastado.
+    @Published var marquee: CGRect?
+    private var marqueeBase: Set<URL> = []
+
+    func marqueeChanged(from a: CGPoint, to b: CGPoint) {
+        let r = CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(b.x - a.x), height: abs(b.y - a.y))
+        if marquee == nil {
+            let mods = NSEvent.modifierFlags
+            marqueeBase = mods.contains(.command) || mods.contains(.shift) ? selection : []
+        }
+        marquee = r
+        let visible = Set(filtered.map { $0.url })
+        var sel = marqueeBase
+        for (u, f) in cardFrames where visible.contains(u) && f.intersects(r) { sel.insert(u) }
+        if sel != selection { selection = sel }
+    }
+
+    func marqueeEnded() {
+        marquee = nil
+        if let first = filtered.first(where: { selection.contains($0.url) }) { anchor = first.url }
+    }
+
     func selectAll() { selection = Set(filtered.map { $0.url }) }
     func clearSelection() { selection = []; anchor = nil }
 
@@ -205,12 +231,17 @@ struct HistoryView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
+                GeometryReader { viewport in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 18, pinnedViews: [.sectionHeaders]) {
                         ForEach(m.groups, id: \.title) { g in
                             Section {
                                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 280), spacing: 14)], spacing: 14) {
-                                    ForEach(g.items) { it in card(it) }
+                                    ForEach(g.items) { it in
+                                        card(it).background(GeometryReader { geo in
+                                            Color.clear.preference(key: CardFramesKey.self, value: [it.url: geo.frame(in: .named("history"))])
+                                        })
+                                    }
                                 }
                                 .padding(.horizontal, 16)
                             } header: {
@@ -222,6 +253,28 @@ struct HistoryView: View {
                         }
                     }
                     .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, minHeight: viewport.size.height, alignment: .topLeading)
+                    // seleção com o rato: arrastar a partir de um espaço vazio desenha um retângulo
+                    .background(
+                        Color.primary.opacity(0.0001)
+                            .gesture(DragGesture(minimumDistance: 4, coordinateSpace: .named("history"))
+                                .onChanged { m.marqueeChanged(from: $0.startLocation, to: $0.location) }
+                                .onEnded { _ in m.marqueeEnded() })
+                            .onTapGesture { m.clearSelection() }
+                    )
+                    .overlay(alignment: .topLeading) {
+                        if let r = m.marquee {
+                            Rectangle()
+                                .fill(Theme.accentColor.opacity(0.15))
+                                .overlay(Rectangle().strokeBorder(Theme.accentColor.opacity(0.8), lineWidth: 1))
+                                .frame(width: r.width, height: r.height)
+                                .offset(x: r.minX, y: r.minY)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .coordinateSpace(name: "history")
+                    .onPreferenceChange(CardFramesKey.self) { m.cardFrames.merge($0) { _, new in new } }
+                }
                 }
                 .onDeleteCommand { m.trash(m.selectedItems) }
                 .onExitCommand { m.clearSelection() }
@@ -250,6 +303,13 @@ struct HistoryView: View {
                     onReveal: { m.reveal(m.targets(for: it)) },
                     onTrash: { m.trash(m.targets(for: it)) },
                     onRename: { startRename(it) })
+    }
+}
+
+private struct CardFramesKey: PreferenceKey {
+    static var defaultValue: [URL: CGRect] = [:]
+    static func reduce(value: inout [URL: CGRect], nextValue: () -> [URL: CGRect]) {
+        value.merge(nextValue()) { _, new in new }
     }
 }
 

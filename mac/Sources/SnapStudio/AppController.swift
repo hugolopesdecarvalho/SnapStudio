@@ -304,10 +304,14 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
         hk.unregisterAll()
         var failed: [String] = []
         let s = settings
-        if !hk.register(id: 1, s.hotkeyRegion, action: { [weak self] in self?.startCapture(.region) }) { failed.append(s.hotkeyRegion.display) }
-        if !hk.register(id: 2, s.hotkeyWindow, action: { [weak self] in self?.startCapture(.activeWindow) }) { failed.append(s.hotkeyWindow.display) }
-        if !hk.register(id: 3, s.hotkeyFull, action: { [weak self] in self?.startCapture(.fullScreen) }) { failed.append(s.hotkeyFull.display) }
-        if !hk.register(id: 4, s.hotkeyRecord, action: { [weak self] in self?.toggleRecording() }) { failed.append(s.hotkeyRecord.display) }
+        // a mesma tecla pode abrir também a captura do macOS, que ficaria com o primeiro arrasto
+        func guarded(_ f: @escaping () -> Void) -> () -> Void {
+            { SystemCaptureGuard.cancelSystemCaptureFromSameKeypress(); f() }
+        }
+        if !hk.register(id: 1, s.hotkeyRegion, action: guarded { [weak self] in self?.startCapture(.region) }) { failed.append(s.hotkeyRegion.display) }
+        if !hk.register(id: 2, s.hotkeyWindow, action: guarded { [weak self] in self?.startCapture(.activeWindow) }) { failed.append(s.hotkeyWindow.display) }
+        if !hk.register(id: 3, s.hotkeyFull, action: guarded { [weak self] in self?.startCapture(.fullScreen) }) { failed.append(s.hotkeyFull.display) }
+        if !hk.register(id: 4, s.hotkeyRecord, action: guarded { [weak self] in self?.toggleRecording() }) { failed.append(s.hotkeyRecord.display) }
         if notify && !failed.isEmpty {
             self.notify(S.t("Atalho em uso", "Shortcut in use"),
                         S.t("Não foi possível registar: ", "Could not register: ") + failed.joined(separator: ", ") +

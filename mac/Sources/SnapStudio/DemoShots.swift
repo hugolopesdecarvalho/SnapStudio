@@ -123,6 +123,18 @@ enum DemoShots {
         let wc = HostWindowController(title: "History", size: CGSize(width: 1000, height: 640), root: AnyView(HistoryView(model: m)), resizable: true, autosave: nil)
         wc.window?.center(); wc.window?.orderFrontRegardless(); pump(2)
         shoot(wc.window!, outDir.appendingPathComponent("history-multi.png"))
+        // seleção com o rato: retângulo que apanha as duas primeiras
+        check(m.cardFrames.count >= 2, "posições dos cartões (\(m.cardFrames.count))")
+        if let a = m.cardFrames[f[0].url], let b = m.cardFrames[f[1].url] {
+            m.clearSelection()
+            let u = a.union(b)
+            m.marqueeChanged(from: CGPoint(x: u.minX + 20, y: u.minY + 20), to: CGPoint(x: u.maxX - 20, y: u.maxY - 20))
+            pump(0.3)
+            shoot(wc.window!, outDir.appendingPathComponent("history-marquee.png"))
+            m.marqueeEnded()
+            check(m.selection == [f[0].url, f[1].url], "retângulo seleciona 2 (\(m.selection.count))")
+            check(m.marquee == nil, "retângulo desaparece")
+        }
         wc.window?.orderOut(nil)
         // apagar uma (sem diálogo)
         m.clearSelection(); m.click(f[5], modifiers: [])
