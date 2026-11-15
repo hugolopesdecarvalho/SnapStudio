@@ -9,12 +9,8 @@ The interface is in Portuguese when macOS is set to Portuguese, and in English o
 2. Drag `SnapStudio.app` to the **Applications** folder and open it.
 3. The app is not notarized by Apple, so macOS blocks it the first time. Go to *System Settings › Privacy & Security*, scroll down to the message about SnapStudio and click **Open Anyway**. You only need to do this once.
 
-## Build, install and run
-```bash
-cd mac
-./build.sh --install --run
-```
-The app is installed to `/Applications/SnapStudio.app` and appears in the menu bar (viewfinder icon).
+## Menu bar
+SnapStudio appears in the menu bar (viewfinder icon).
 **Click** the icon to open the panel: capture, record video, see recent captures, switch theme and open the history. **Right-click** (or Control-click) for the full menu.
 
 ### Screen recording permission
@@ -22,7 +18,7 @@ On the first capture, macOS asks for permission. Turn on SnapStudio in
 *System Settings › Privacy & Security › Screen & System Audio Recording* and reopen the app.
 SnapStudio's *Settings › General* shows whether the permission has been granted.
 
-> Since 1.1.2, the app is signed with a fixed identity (`com.snapstudio.mac`), so the permission is kept when you update or rebuild. If you are coming from an earlier version and the app keeps asking for permission even though it is turned on, remove the old entry from that list with “−” and allow it again (only once). To sign with a *Developer ID* certificate: `SIGN_ID="Developer ID Application: …" ./build.sh`.
+> Since 1.1.2, the app is signed with a fixed identity (`com.snapstudio.mac`), so the permission is kept when you update or rebuild. If you are coming from an earlier version and the app keeps asking for permission even though it is turned on, remove the old entry from that list with “−” and allow it again (only once).
 
 ## Capture
 Macs have no PrtScn key. The default shortcuts avoid the system ones (⌘⇧3/4/5, which keep working) and can be changed in *Settings › Shortcuts*:
@@ -58,38 +54,3 @@ User data in `~/Library/Application Support/SnapStudio`.
 
 ## Updates
 SnapStudio checks the [releases page](https://github.com/hugolopesdecarvalho/SnapStudio/releases) shortly after launch and then once a day. When a newer version is published it shows a notification, a banner in the panel and a window with the release notes, with **Download**, **Later** and **Skip This Version**. You can also use *Check for Updates…* in the menu bar icon's right-click menu or in *Settings › About*, where automatic checks can be turned off. Only GitHub's public API is contacted; no personal data is sent.
-
-## Build
-Only the Command Line Tools are needed (`xcode-select --install`); Xcode is not required.
-```bash
-./build.sh            # universal binary (arm64 + x86_64) → build/SnapStudio.app
-FAST=1 ./build.sh     # this Mac's architecture only (faster)
-./build.sh --run      # build and open
-```
-`build.sh` calls `swiftc` directly. `Package.swift` lets you open the project in Xcode (`open Package.swift`).
-
-Headless tests:
-```bash
-build/SnapStudio.app/Contents/MacOS/SnapStudio --render-test /tmp/snap-test
-```
-This test draws every annotation on a synthetic image, checks serialization, geometry and blurring, and writes PNGs. `--ui-snapshot <folder> [light|dark]` renders the panel, the editors, the history and the settings off-screen.
-
-Repository images:
-```bash
-APP=build/SnapStudio.app/Contents/MacOS/SnapStudio
-$APP --readme-shots ../assets/screenshots   # real windows with fictional captures (needs Screen Recording permission)
-$APP --make-ico ../assets/app.ico           # Windows icon, same design as the Mac icon
-```
-
-## Code (`Sources/SnapStudio`)
-| File | Windows equivalent | Contents |
-|---|---|---|
-| `AppController.swift` | `TrayApp.cs` | menu bar, shortcuts, capture and video flows, windows, notifications |
-| `Capture.swift`, `RegionSelector.swift` | `CaptureService.cs`, `RegionSelector.cs`, `Native.cs` | ScreenCaptureKit, window list, capture mode |
-| `Annotations.swift` | `Annotations.cs` | annotation model and drawing (Core Graphics + Core Image) |
-| `EditorModel.swift`, `CanvasView.swift`, `EditorView.swift` | `EditorForm.cs` | quick and full editor |
-| `VideoRecorder.swift`, `RecordingUI.swift` | `VideoRecorder.cs`, `RecordingUI.cs` | SCStream → AVAssetWriter (MP4/H.264), frame and bar |
-| `TrayPanel.swift`, `HistoryView.swift`, `SettingsView.swift` | `TrayPanel.cs`, `HistoryForm.cs`, `SettingsForm.cs` | panel, history, settings |
-| `HotKeys.swift` | `MessageWindow` | global shortcuts (Carbon, no Accessibility permission needed) |
-| `Updates.swift` | `Updates.cs` | version check against GitHub releases, update window |
-| `Settings.swift`, `Theme.swift`, `Strings.swift` | same | settings, theme, PT/EN strings |

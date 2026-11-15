@@ -7,3 +7,5 @@ bin/
 Thumbs.db
 desktop.ini
 .DS_Store
+# Local notes for Claude (not committed)
+CLAUDE.md

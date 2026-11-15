@@ -127,27 +127,3 @@ Start a recording with the shortcut or the *Record screen video* button, then ch
 |---|---|---|
 | Captures and videos | `Pictures\SnapStudio` | `~/Pictures/SnapStudio` |
 | Settings and editable annotations | `%APPDATA%\SnapStudio` | `~/Library/Application Support/SnapStudio` |
-
-## Building from source
-**Windows**: no .NET SDK needed. The script uses the `csc.exe` from the .NET Framework that ships with Windows and writes `bin\SnapStudio.exe`.
-```
-powershell -ExecutionPolicy Bypass -File build.ps1
-```
-
-**macOS**: only the Command Line Tools are needed (`xcode-select --install`). The script builds a universal `mac/build/SnapStudio.app`. `--install` copies it to Applications and `--run` opens it.
-```bash
-cd mac && ./build.sh --install --run
-```
-
-### Releasing a new version
-1. Bump the version in **both** places: `src/AssemblyInfo.cs` (Windows) and `VERSION` in `mac/build.sh` (macOS).
-2. Build on Windows (`build.ps1` writes `bin\SnapStudio-Windows.zip`) and on a Mac (`cd mac && ./build.sh` writes `build/SnapStudio-macOS.zip`).
-3. Create a GitHub release tagged `vX.Y.Z` with both zips attached. Ship zips, not a bare `.exe`: browsers warn about unsigned executables far more than about zip files. The apps compare the tag with their own version to offer the update, and pick the `Windows` / `macOS` zip for the download button.
-
-## Repository layout
-| Path | Contents |
-|---|---|
-| `src/` | Windows version (C#, WinForms) |
-| `build.ps1`, `app.manifest` | Windows build script and manifest |
-| `mac/` | macOS version (Swift, AppKit, SwiftUI), with its own [README](mac/README.md) |
-| `assets/` | icon, logo, social preview image and screenshots |
