@@ -120,9 +120,16 @@ namespace SnapStudio
                         PageUrl = string.IsNullOrEmpty(gh.HtmlUrl) ? ReleasesUrl : gh.HtmlUrl,
                         Notes = gh.Body ?? "",
                     };
+                    // o zip para Windows (os browsers desconfiam menos de um zip do que de um .exe); senão um .exe
                     if (gh.Assets != null)
+                    {
                         foreach (var a in gh.Assets)
-                            if (a != null && a.Name != null && a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) { r.DownloadUrl = a.Url; break; }
+                            if (a != null && a.Name != null && a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) &&
+                                a.Name.IndexOf("windows", StringComparison.OrdinalIgnoreCase) >= 0) { r.DownloadUrl = a.Url; break; }
+                        if (r.DownloadUrl == null)
+                            foreach (var a in gh.Assets)
+                                if (a != null && a.Name != null && a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) { r.DownloadUrl = a.Url; break; }
+                    }
                     return r;
                 }
             }
@@ -291,8 +298,8 @@ namespace SnapStudio
                 Location = new Point(Sc(96), Sc(58)),
                 Font = Theme.Font(12.5f * dpi),
                 Text = S.T("Tem a versão ", "You have version ") + Updates.CurrentVersion +
-                       S.T(". Descarregue o novo SnapStudio.exe e substitua o atual (feche primeiro a SnapStudio).",
-                           ". Download the new SnapStudio.exe and replace the current one (quit SnapStudio first)."),
+                       S.T(". Descarregue a nova versão, extraia o SnapStudio.exe e substitua o atual (feche primeiro a SnapStudio).",
+                           ". Download the new version, extract SnapStudio.exe and replace the current one (quit SnapStudio first)."),
             }.Muted();
             var notes = new TextBox
             {

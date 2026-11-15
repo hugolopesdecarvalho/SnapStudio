@@ -63,13 +63,13 @@
 Get the files from the [latest release](https://github.com/hugolopesdecarvalho/SnapStudio/releases/latest).
 
 ### Windows 10/11
-1. Download **SnapStudio.exe** and put it in any folder. No installation needed: it uses .NET Framework 4.8, which ships with Windows.
-2. Open it. The icon appears next to the clock (system tray).
-3. The file is not digitally signed, so Windows may show "Windows protected your PC". Click **More info › Run anyway**.
+1. Download **SnapStudio-Windows.zip**, right-click it and choose **Extract All…**. Put `SnapStudio.exe` in any folder. No installation needed: it uses .NET Framework 4.8, which ships with Windows.
+2. Open `SnapStudio.exe`. The icon appears next to the clock (system tray).
+3. The app is not digitally signed, so the first time Windows may show "Windows protected your PC". Click **More info › Run anyway**. You only need to do this once.
 
 ### macOS 14 (Sonoma) or later, Apple Silicon and Intel
 1. Download **SnapStudio-macOS.zip**, open it and drag **SnapStudio.app** to **Applications**.
-2. The app is not notarized by Apple, so macOS blocks it the first time. Go to *System Settings › Privacy & Security* and click **Open Anyway**.
+2. The app is not notarized by Apple, so macOS blocks it the first time. Go to *System Settings › Privacy & Security*, scroll down to the message about SnapStudio and click **Open Anyway**. You only need to do this once.
 3. On the first capture, allow SnapStudio in *Privacy & Security › Screen & System Audio Recording*, then reopen the app.
 
 More details in [`mac/README.md`](mac/README.md).
@@ -141,8 +141,8 @@ cd mac && ./build.sh --install --run
 
 ### Releasing a new version
 1. Bump the version in **both** places: `src/AssemblyInfo.cs` (Windows) and `VERSION` in `mac/build.sh` (macOS).
-2. Build `bin\SnapStudio.exe` on Windows and `SnapStudio-macOS.zip` on a Mac (`cd mac && ./build.sh`, then zip `build/SnapStudio.app` with `ditto -c -k --keepParent`).
-3. Create a GitHub release tagged `vX.Y.Z` with both files attached. The apps compare that tag with their own version to offer the update, and pick the `.exe` / `macOS` asset for the download button.
+2. Build on Windows (`build.ps1` writes `bin\SnapStudio-Windows.zip`) and on a Mac (`cd mac && ./build.sh` writes `build/SnapStudio-macOS.zip`).
+3. Create a GitHub release tagged `vX.Y.Z` with both zips attached. Ship zips, not a bare `.exe`: browsers warn about unsigned executables far more than about zip files. The apps compare the tag with their own version to offer the update, and pick the `Windows` / `macOS` zip for the download button.
 
 ## Repository layout
 | Path | Contents |

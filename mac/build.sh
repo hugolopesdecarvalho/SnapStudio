@@ -109,6 +109,12 @@ fi
 codesign --verify --deep --strict "$APP"
 echo "OK -> $APP"
 
+# ficheiro para a release
+ZIP="$OUT/SnapStudio-macOS.zip"
+rm -f "$ZIP"
+ditto -c -k --keepParent "$APP" "$ZIP"
+echo "OK -> $ZIP"
+
 if [ "$INSTALL" = 1 ]; then
   rm -rf "/Applications/SnapStudio.app"
   cp -R "$APP" /Applications/

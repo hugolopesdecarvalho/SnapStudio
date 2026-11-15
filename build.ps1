@@ -37,4 +37,10 @@ if (-not (Test-Path $ico)) {
 
 Invoke-Compile $true
 Write-Host "OK -> $exe"
+
+# ficheiro para a release: um zip passa nos browsers sem o aviso que um .exe solto recebe
+$zip = Join-Path $bin 'SnapStudio-Windows.zip'
+if (Test-Path $zip) { Remove-Item $zip -Force }
+Compress-Archive -Path $exe -DestinationPath $zip
+Write-Host "OK -> $zip"
 if ($Run) { Start-Process $exe }
