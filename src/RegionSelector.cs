@@ -195,22 +195,12 @@ namespace SnapStudio
 
         // ---------- desenho ----------
 
-        Rectangle MagnifierRect()
-        {
-            int size = (int)(120 * dpi), info = (int)(44 * dpi), off = (int)(24 * dpi);
-            Rectangle mon = ToClient(Screen.FromPoint(new Point(mouse.X + vs.X, mouse.Y + vs.Y)).Bounds);
-            int x = mouse.X + off, y = mouse.Y + off;
-            if (x + size > mon.Right) x = mouse.X - off - size;
-            if (y + size + info > mon.Bottom) y = mouse.Y - off - size - info;
-            return new Rectangle(x, y, size, size + info);
-        }
-
         Rectangle CurrentDirty()
         {
             Rectangle hi = dragging ? sel : hover;
-            Rectangle d = MagnifierRect();
-            if (hi.Width > 0) { var h2 = hi; h2.Inflate((int)(4 * dpi), (int)(30 * dpi)); d = Rectangle.Union(d, h2); }
-            d.Inflate(2, 2);
+            if (hi.Width <= 0) return Rectangle.Empty;
+            var d = hi;
+            d.Inflate((int)(4 * dpi), (int)(30 * dpi));   // moldura e etiqueta do tamanho
             return d;
         }
 
@@ -240,7 +230,6 @@ namespace SnapStudio
             }
 
             DrawBar(g);
-            if (!mouseDown || dragging) DrawMagnifier(g);
         }
 
         void DrawSizeLabel(Graphics g, Rectangle hi)
@@ -271,39 +260,6 @@ namespace SnapStudio
                 TextRenderer.DrawText(g, bt.Text, uiFont, bt.Rect, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             }
             g.SmoothingMode = SmoothingMode.None;
-        }
-
-        void DrawMagnifier(Graphics g)
-        {
-            Rectangle box = MagnifierRect();
-            int size = box.Width, cells = 15;
-            var dest = new Rectangle(box.X, box.Y, size, size);
-            var src = new Rectangle(mouse.X - cells / 2, mouse.Y - cells / 2, cells, cells);
-            g.FillRectangle(Brushes.Black, box);
-            var st = g.Save();
-            g.InterpolationMode = InterpolationMode.NearestNeighbor;
-            g.PixelOffsetMode = PixelOffsetMode.Half;
-            g.SetClip(dest);
-            g.DrawImage(shot, dest, src, GraphicsUnit.Pixel);
-            g.Restore(st);
-            float cell = size / (float)cells;
-            using (var p = new Pen(Color.FromArgb(160, Accent), 1))
-            {
-                g.DrawLine(p, dest.X, dest.Y + size / 2f, dest.Right, dest.Y + size / 2f);
-                g.DrawLine(p, dest.X + size / 2f, dest.Y, dest.X + size / 2f, dest.Bottom);
-            }
-            using (var p = new Pen(Color.White, 1))
-                g.DrawRectangle(p, dest.X + (cells / 2) * cell, dest.Y + (cells / 2) * cell, cell, cell);
-
-            Color c = Color.Black;
-            if (mouse.X >= 0 && mouse.Y >= 0 && mouse.X < original.Width && mouse.Y < original.Height)
-                c = original.GetPixel(mouse.X, mouse.Y);
-            string l1 = "X " + (mouse.X + vs.X) + "   Y " + (mouse.Y + vs.Y);
-            string l2 = "#" + c.R.ToString("X2") + c.G.ToString("X2") + c.B.ToString("X2");
-            var info = new Rectangle(box.X, dest.Bottom, size, box.Height - size);
-            TextRenderer.DrawText(g, l1 + "\n" + l2, smallFont, info, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-            using (var p = new Pen(Color.FromArgb(200, 255, 255, 255), 1))
-                g.DrawRectangle(p, box.X, box.Y, box.Width - 1, box.Height - 1);
         }
 
         static GraphicsPath Rounded(Rectangle r, int rad)
