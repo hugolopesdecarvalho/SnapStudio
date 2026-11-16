@@ -105,10 +105,17 @@ namespace SnapStudio
             {
                 int w = Px(24);
                 if (!string.IsNullOrEmpty(icon)) w += Px(iconSize) + (string.IsNullOrEmpty(Text) ? 0 : Px(8));
-                if (!string.IsNullOrEmpty(Text)) w += TextRenderer.MeasureText(Text, Font).Width;
+                if (!string.IsNullOrEmpty(Text)) w += Measure(Text, Font).Width;
                 if (!string.IsNullOrEmpty(badge)) w += Px(10) + TextRenderer.MeasureText(badge, Theme.Font(12 * dpi, FontStyle.Bold)).Width + Px(10);
                 return w;
             }
+        }
+
+        /// <summary>Tamanho do texto sem a margem que o TextRenderer junta por omissão
+        /// (o texto é desenhado com NoPadding; medir com margem descentrava o conteúdo).</summary>
+        static Size Measure(string text, Font font)
+        {
+            return TextRenderer.MeasureText(text, font, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -167,7 +174,7 @@ namespace SnapStudio
 
             if (vertical)
             {
-                int th = string.IsNullOrEmpty(text) ? 0 : TextRenderer.MeasureText(text, font).Height;
+                int th = string.IsNullOrEmpty(text) ? 0 : Measure(text, font).Height;
                 int total = (img != null ? isz : 0) + (th > 0 && img != null ? Px(4) : 0) + th;
                 int y = (Height - total) / 2;
                 if (img != null) { g.DrawImage(img, (Width - isz) / 2, y, isz, isz); y += isz + Px(4); }
@@ -176,7 +183,7 @@ namespace SnapStudio
             else
             {
                 bool left = kind == BtnKind.Nav || !string.IsNullOrEmpty(badge) && kind != BtnKind.Primary;
-                int tw = string.IsNullOrEmpty(text) ? 0 : TextRenderer.MeasureText(text, font).Width;
+                int tw = string.IsNullOrEmpty(text) ? 0 : Measure(text, font).Width;
                 Font bf = Theme.Font(12 * dpi, kind == BtnKind.Primary ? FontStyle.Bold : FontStyle.Regular);
                 int bw = string.IsNullOrEmpty(badge) ? 0 : TextRenderer.MeasureText(badge, bf).Width + (kind == BtnKind.Primary ? Px(12) : 0);
                 int content = (img != null ? isz : 0) + (img != null && tw > 0 ? Px(8) : 0) + tw + (kind == BtnKind.Primary && bw > 0 ? Px(10) + bw : 0);
