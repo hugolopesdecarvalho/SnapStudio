@@ -8,6 +8,7 @@ let captureLog = Logger(subsystem: "com.snapstudio.mac", category: "capture")
 
 enum SelectionResult {
     case region(ScreenShot, CGRect)   // retângulo em pontos locais do ecrã (origem em baixo à esquerda)
+    case window(ScreenShot, CGRect, CGWindowID)   // clique numa janela: a zona e a janela escolhida
     case allScreens
     case cancelled
 }
@@ -36,10 +37,10 @@ final class RegionSelector {
         let mouse = NSEvent.mouseLocation
         for shot in shots {
             let w = OverlayWindow(shot: shot)
-            let local = wins.compactMap { wi -> CGRect? in
+            let local = wins.compactMap { wi -> (CGRect, CGWindowID)? in
                 let r = wi.frame.intersection(shot.frame)
                 if r.isNull || r.width < 8 || r.height < 8 { return nil }
-                return r.offsetBy(dx: -shot.frame.minX, dy: -shot.frame.minY)
+                return (r.offsetBy(dx: -shot.frame.minX, dy: -shot.frame.minY), wi.id)
             }
             let v = OverlayView(shot: shot, windows: local, owner: sel)
             w.contentView = v
@@ -65,7 +66,7 @@ final class RegionSelector {
 
     func finish(_ r: SelectionResult) {
         let kind: String
-        switch r { case .region(_, let rect): kind = "region \(Int(rect.width))x\(Int(rect.height))"; case .allScreens: kind = "allScreens"; case .cancelled: kind = "cancelled" }
+        switch r { case .region(_, let rect): kind = "region \(Int(rect.width))x\(Int(rect.height))"; case .window: kind = "window"; case .allScreens: kind = "allScreens"; case .cancelled: kind = "cancelled" }
         captureLog.notice("selector finish: \(kind, privacy: .public) pending=\(self.completion != nil)")
         guard let c = completion else { return }
         completion = nil
@@ -130,6 +131,7 @@ final class OverlayWindow: NSPanel {
 final class OverlayView: NSView {
     let shot: ScreenShot
     let windowRects: [CGRect]
+    let windowIDs: [CGWindowID]
     weak var owner: RegionSelector?
     weak var bar: NSView?
 
@@ -138,9 +140,10 @@ final class OverlayView: NSView {
     private var sel: CGRect?
     private var hover: CGRect?
 
-    init(shot: ScreenShot, windows: [CGRect], owner: RegionSelector) {
+    init(shot: ScreenShot, windows: [(CGRect, CGWindowID)], owner: RegionSelector) {
         self.shot = shot
-        self.windowRects = windows
+        self.windowRects = windows.map { $0.0 }
+        self.windowIDs = windows.map { $0.1 }
         self.owner = owner
         super.init(frame: CGRect(origin: .zero, size: shot.frame.size))
     }
@@ -207,8 +210,11 @@ final class OverlayView: NSView {
         }
         // clique: a janela debaixo do rato, ou o ecrã inteiro
         let p = convert(event.locationInWindow, from: nil)
-        let r = windowRects.first(where: { $0.contains(p) }) ?? bounds
-        owner?.finish(.region(shot, r.intersection(bounds).integral))
+        if let i = windowRects.firstIndex(where: { $0.contains(p) }) {
+            owner?.finish(.window(shot, windowRects[i].intersection(bounds).integral, windowIDs[i]))
+        } else {
+            owner?.finish(.region(shot, bounds))
+        }
     }
 
     private func clamp(_ p: CGPoint) -> CGPoint {

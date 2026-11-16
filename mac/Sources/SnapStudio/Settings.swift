@@ -60,6 +60,7 @@ final class Settings: Codable {
     var copyToClipboard = true
     var showNotification = true
     var afterCapture: String = "quick"        // quick | full | none
+    var windowCorners: String = "white"       // cantos de uma janela capturada: white | black | transparent | screen
     var themeMode: String = "system"          // system | light | dark
     var accent: String = "indigo"             // indigo | blue | teal | orange | system
     var hotkeyRegion = Hotkey.ctrlShift(kVK_ANSI_4)
@@ -85,7 +86,7 @@ final class Settings: Codable {
     var isNew = false
 
     enum CodingKeys: String, CodingKey {
-        case outputFolder, format, copyToClipboard, showNotification, afterCapture, themeMode, accent
+        case outputFolder, format, copyToClipboard, showNotification, afterCapture, windowCorners, themeMode, accent
         case hotkeyRegion, hotkeyWindow, hotkeyFull, hotkeyRecord, videoFps, videoCursor
         case editorColor, editorWidth, editorFont, editorRounded, editorRadius, editorFill, editorFillOpacity, editorTextOutline
         case panelWidth, panelHeight
@@ -103,6 +104,7 @@ final class Settings: Codable {
         copyToClipboard = v(.copyToClipboard, copyToClipboard)
         showNotification = v(.showNotification, showNotification)
         afterCapture = v(.afterCapture, afterCapture)
+        windowCorners = v(.windowCorners, windowCorners)
         themeMode = v(.themeMode, themeMode)
         accent = v(.accent, accent)
         hotkeyRegion = v(.hotkeyRegion, hotkeyRegion)
@@ -144,6 +146,7 @@ final class Settings: Codable {
             if s.outputFolder.isEmpty { s.outputFolder = defaultFolder }
             if s.format != "jpg" { s.format = "png" }
             if !["quick", "full", "none"].contains(s.afterCapture) { s.afterCapture = "quick" }
+            if !["white", "black", "transparent", "screen"].contains(s.windowCorners) { s.windowCorners = "white" }
             if !["light", "dark"].contains(s.themeMode) { s.themeMode = "system" }
             if s.accent.isEmpty { s.accent = "indigo" }
             if ![15, 30, 60].contains(s.videoFps) { s.videoFps = 30 }

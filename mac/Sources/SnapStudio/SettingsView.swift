@@ -193,6 +193,18 @@ struct SettingsView: View {
             }
             .pickerStyle(.radioGroup)
             Section {
+                Picker(S.t("Cantos das janelas", "Window corners"), selection: st.bind(\.windowCorners)) {
+                    Text(S.t("Fundo branco", "White background")).tag("white")
+                    Text(S.t("Fundo preto", "Black background")).tag("black")
+                    Text(S.t("Transparentes (PNG)", "Transparent (PNG)")).tag("transparent")
+                    Text(S.t("Fundo do ecrã", "Screen background")).tag("screen")
+                }
+            } footer: {
+                Text(S.t("Ao clicar numa janela no modo captura, ou ao capturar a janela ativa. As janelas do macOS têm cantos arredondados: em vez do que está por trás, os cantos ficam com este fundo.",
+                         "When you click a window in capture mode, or capture the active window. macOS windows have rounded corners: instead of whatever is behind them, the corners get this background."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
                 Toggle(S.t("Copiar para a área de transferência", "Copy to the clipboard"), isOn: st.bind(\.copyToClipboard))
                 Toggle(S.t("Mostrar notificação", "Show a notification"), isOn: st.bind(\.showNotification))
             } footer: {

@@ -30,6 +30,8 @@ Macs have no PrtScn key. The default shortcuts avoid the system ones (⌘⇧3/4/
 | ⌃⇧3 | All screens |
 | ⌃⇧5 | Record screen video (start / stop) |
 
+A clicked window (or the active window) is captured on its own, without its shadow. macOS windows have rounded corners, so *Settings › After capture › Window corners* sets what fills them: white (default), black, transparent (PNG) or the screen behind the window.
+
 After a capture, the image is saved to `Pictures/SnapStudio`, **copied to the clipboard** (⌘V in any app) and, depending on Settings, opened in:
 - **Quick editor** (pop-up below the menu bar): select, arrow, box, text, blur, steps, crop; *Copy and close* (⌘↩). Esc or clicking outside saves and closes. Only used right after a capture: captures opened from the panel, history or a notification open in the full editor.
 - **Full editor**: all tools, properties (color, width, text size) and the annotation list.

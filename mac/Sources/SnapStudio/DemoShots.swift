@@ -90,6 +90,32 @@ enum DemoShots {
     }
 
     /// `--history-test <pasta>`: testa a seleção múltipla do histórico (pasta temporária, definições só em memória).
+    /// `--window-test <pasta>`: captura a primeira janela visível e verifica que os cantos ficam brancos.
+    static func windowTest(outDir: URL) -> Bool {
+        try? FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
+        guard let w = Capture.visibleWindows().first(where: { $0.pid != getpid() }) else { print("FALHA: sem janelas"); return false }
+        var result: CGImage?
+        let done = DispatchSemaphore(value: 0)
+        Task.detached { result = try? await Capture.captureWindow(id: w.id); done.signal() }
+        while done.wait(timeout: .now()) == .timedOut { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+        guard let raw = result else { print("FALHA: captura da janela"); return false }
+        let flat = Capture.flatten(raw, on: CGColor(gray: 1, alpha: 1))
+        try? ImageUtil.save(raw, to: outDir.appendingPathComponent("window-raw.png"))
+        try? ImageUtil.save(flat, to: outDir.appendingPathComponent("window-white.png"))
+        func px(_ img: CGImage, _ x: Int, _ y: Int) -> [UInt8] {
+            var b = [UInt8](repeating: 0, count: 4)
+            let g = CGContext(data: &b, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            g.draw(img, in: CGRect(x: -x, y: -(img.height - 1 - y), width: img.width, height: img.height))
+            return b
+        }
+        let rawCorner = px(raw, 0, 0), flatCorner = px(flat, 0, 0)
+        print("janela \(raw.width)x\(raw.height) canto original RGBA=\(rawCorner) depois=\(flatCorner)")
+        let ok = rawCorner[3] < 255 && flatCorner == [255, 255, 255, 255]
+        print(ok ? "OK — cantos transparentes passam a branco" : "FALHA: cantos")
+        return ok
+    }
+
     static func historyTest(outDir: URL) -> Bool {
         NSApplication.shared.setActivationPolicy(.accessory)
         let fm = FileManager.default

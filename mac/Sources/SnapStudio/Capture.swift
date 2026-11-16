@@ -144,17 +144,19 @@ enum Capture {
         return out
     }
 
-    /// Janela da frente da app ativa (a que estava em primeiro plano antes da SnapStudio).
-    static func captureActiveWindow(pid: pid_t?) async throws -> CGImage? {
+    /// Uma janela sozinha, sem sombra, com os cantos arredondados transparentes.
+    static func captureWindow(id: CGWindowID) async throws -> CGImage? {
         let content = try await shareable()
-        let wins = visibleWindows()
-        guard let target = wins.first(where: { pid == nil || $0.pid == pid }) ?? wins.first,
-              let scw = content.windows.first(where: { $0.windowID == target.id }) else {
-            return compose(try await snapshotScreens())
-        }
+        guard let scw = content.windows.first(where: { $0.windowID == id }) else { return nil }
+        return try await captureImage(of: scw)
+    }
+
+    private static func captureImage(of scw: SCWindow) async throws -> CGImage {
         let filter = SCContentFilter(desktopIndependentWindow: scw)
         let cfg = SCStreamConfiguration()
-        let screen = NSScreen.screens.first(where: { $0.frame.intersects(target.frame) }) ?? NSScreen.main
+        let cocoa = CGRect(x: scw.frame.minX, y: (NSScreen.screens.first?.frame.height ?? 0) - scw.frame.maxY,
+                           width: scw.frame.width, height: scw.frame.height)
+        let screen = NSScreen.screens.first(where: { $0.frame.intersects(cocoa) }) ?? NSScreen.main
         let scale = screen?.backingScaleFactor ?? 2
         cfg.width = Int(scw.frame.width * scale)
         cfg.height = Int(scw.frame.height * scale)
@@ -163,5 +165,28 @@ enum Capture {
         cfg.captureResolution = .best
         cfg.colorSpaceName = CGColorSpace.sRGB
         return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: cfg)
+    }
+
+    /// Pinta o que é transparente (os cantos arredondados da janela) com uma cor sólida.
+    static func flatten(_ img: CGImage, on color: CGColor) -> CGImage {
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let g = CGContext(data: nil, width: img.width, height: img.height, bitsPerComponent: 8, bytesPerRow: 0,
+                                space: cs, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return img }
+        let r = CGRect(x: 0, y: 0, width: img.width, height: img.height)
+        g.setFillColor(color)
+        g.fill(r)
+        g.draw(img, in: r)
+        return g.makeImage() ?? img
+    }
+
+    /// Janela da frente da app ativa (a que estava em primeiro plano antes da SnapStudio).
+    static func captureActiveWindow(pid: pid_t?) async throws -> CGImage? {
+        let content = try await shareable()
+        let wins = visibleWindows()
+        guard let target = wins.first(where: { pid == nil || $0.pid == pid }) ?? wins.first,
+              let scw = content.windows.first(where: { $0.windowID == target.id }) else {
+            return compose(try await snapshotScreens())
+        }
+        return try await captureImage(of: scw)
     }
 }

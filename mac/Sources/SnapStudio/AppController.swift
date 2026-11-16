@@ -358,10 +358,19 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
             case .activeWindow:
                 // se a SnapStudio estava à frente (editor, histórico…), é a janela dela que se captura
                 img = try await Capture.captureActiveWindow(pid: activeAppPidAtRequest ?? lastExternalApp?.processIdentifier)
+                if let i = img { img = windowCorners(i) }
             case .region:
                 let shots = try await Capture.snapshotScreens()
                 switch await select(shots) {
                 case .region(let shot, let r): img = shot.crop(r); scale = shot.scale
+                case .window(let shot, let r, let id):
+                    scale = shot.scale
+                    // a janela sozinha (cantos arredondados tratados à parte); "fundo do ecrã" = recorte como uma região
+                    if settings.windowCorners != "screen", let w = try? await Capture.captureWindow(id: id) {
+                        img = windowCorners(w)
+                    } else {
+                        img = shot.crop(r)
+                    }
                 case .allScreens: img = Capture.compose(shots); scale = shots.map { $0.scale }.max() ?? scale
                 case .cancelled: break
                 }
@@ -376,6 +385,15 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
         captureLog.notice("capture result: \(img != nil ? "\(img!.width)x\(img!.height)" : "none", privacy: .public)")
         guard let image = img else { return }
         handleCapture(image, scale: scale)
+    }
+
+    /// Cantos arredondados de uma janela capturada: cor sólida, ou transparentes (só em PNG).
+    private func windowCorners(_ img: CGImage) -> CGImage {
+        switch settings.windowCorners {
+        case "transparent" where settings.format == "png": return img
+        case "black": return Capture.flatten(img, on: CGColor(gray: 0, alpha: 1))
+        default: return Capture.flatten(img, on: CGColor(gray: 1, alpha: 1))
+        }
     }
 
     private func handleCapture(_ img: CGImage, scale: CGFloat) {
@@ -424,7 +442,11 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
             return
         }
         capturing = false
-        guard case .region(let shot, let rect) = result else { return }
+        let shot: ScreenShot, rect: CGRect
+        switch result {
+        case .region(let s, let r), .window(let s, let r, _): shot = s; rect = r
+        default: return
+        }
         if rect.width * shot.scale < 64 || rect.height * shot.scale < 64 {
             notify(S.t("Zona demasiado pequena", "Area too small"), S.t("Escolha uma zona com pelo menos 64 × 64 pixels.", "Choose an area of at least 64 × 64 pixels."), path: nil, force: true)
             return
