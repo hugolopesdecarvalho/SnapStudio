@@ -54,7 +54,7 @@
 - **Clipboard first**: every capture is saved and copied to the clipboard, ready to paste anywhere.
 - **Quick editor** pop-up and a **full editor**: arrows, boxes, text, blur and pixelate to hide sensitive data, highlighter, numbered steps, ellipses, lines, freehand and crop. Annotations stay editable when you reopen a capture.
 - **Screen recording** to MP4 (H.264) at 15/30/60 fps, with pause, stop and cancel. The recording frame and toolbar never appear in the video. Audio is not recorded yet.
-- **History** of captures and videos with thumbnails, search, filters and drag-and-drop to other apps.
+- **History** of captures and videos with thumbnails, search, filters and drag-and-drop to other apps. Select several captures by dragging a rectangle from empty space (or Ctrl/⌘-click, Shift-click) to copy or delete them together.
 - **Light and dark themes**, accent colors, configurable shortcuts, PNG or JPG.
 - Interface in **English and Portuguese**, following the system language.
 - **Update notifications**: SnapStudio checks this repository's releases once a day and tells you when a new version is out (Settings › About shows your version; the check can be turned off). Only a request to GitHub's public API is made, no personal data is sent.

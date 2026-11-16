@@ -34,6 +34,11 @@ namespace SnapStudio
         int hoverAction = -1;
         Point downPt;
         CaptureItem downItem;
+        // seleção com o rato (retângulo), em coordenadas do conteúdo
+        bool marquee;
+        Point marqueeStart, marqueeEnd;
+        HashSet<CaptureItem> marqueeBase = new HashSet<CaptureItem>();
+        System.Windows.Forms.Timer marqueeScroll;
         public string EmptyText = "";
 
         public event Action<CaptureItem> OpenItem;
@@ -58,7 +63,12 @@ namespace SnapStudio
 
         void OnTheme() { if (!IsDisposed) { Theme.ScrollbarTheme(this); Invalidate(); } }
         protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Theme.ScrollbarTheme(this); }
-        protected override void Dispose(bool disposing) { Theme.Changed -= OnTheme; base.Dispose(disposing); }
+        protected override void Dispose(bool disposing)
+        {
+            Theme.Changed -= OnTheme;
+            if (disposing && marqueeScroll != null) marqueeScroll.Dispose();
+            base.Dispose(disposing);
+        }
 
         public void SetItems(List<CaptureItem> items)
         {
@@ -127,9 +137,46 @@ namespace SnapStudio
             return new Rectangle(it.Bounds.Right - Px(8) - (3 - i) * s - (2 - i) * g, it.Bounds.Y + Px(8), s, s);
         }
 
+        Rectangle MarqueeRect()
+        {
+            return Rectangle.FromLTRB(Math.Min(marqueeStart.X, marqueeEnd.X), Math.Min(marqueeStart.Y, marqueeEnd.Y),
+                                      Math.Max(marqueeStart.X, marqueeEnd.X), Math.Max(marqueeStart.Y, marqueeEnd.Y));
+        }
+
+        void UpdateMarquee(Point client)
+        {
+            marqueeEnd = ToContent(client);
+            Rectangle r = MarqueeRect();
+            bool changed = false;
+            foreach (var i in Items)
+            {
+                bool sel = marqueeBase.Contains(i) || (r.Width > 2 && r.Height > 2 && i.Bounds.IntersectsWith(r));
+                if (sel != i.Selected) { i.Selected = sel; changed = true; }
+            }
+            Invalidate();
+            if (changed) RaiseSel();
+        }
+
+        /// <summary>Ao arrastar o retângulo para lá da margem, a lista desliza.</summary>
+        void MarqueeScrollTick(object sender, EventArgs e)
+        {
+            if (!marquee) { marqueeScroll.Stop(); return; }
+            Point m = PointToClient(Cursor.Position);
+            int dy = m.Y < 0 ? m.Y : m.Y > ClientSize.Height ? m.Y - ClientSize.Height : 0;
+            if (dy == 0) return;
+            int top = -AutoScrollPosition.Y;
+            AutoScrollPosition = new Point(0, Math.Max(0, top + Math.Max(-Px(40), Math.Min(Px(40), dy))));
+            UpdateMarquee(m);
+        }
+
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
+            if (marquee)
+            {
+                if (e.Button == MouseButtons.Left) UpdateMarquee(e.Location);
+                return;
+            }
             Point c = ToContent(e.Location);
             var it = ItemAt(c);
             int act = -1;
@@ -160,8 +207,19 @@ namespace SnapStudio
             downItem = null;
             if (it == null)
             {
-                if (e.Button == MouseButtons.Left && (ModifierKeys & (Keys.Control | Keys.Shift)) == 0)
-                { foreach (var i in Items) i.Selected = false; Invalidate(); RaiseSel(); }
+                if (e.Button == MouseButtons.Left)
+                {
+                    // espaço vazio: começa um retângulo de seleção (Ctrl/Shift juntam à seleção atual)
+                    bool add = (ModifierKeys & (Keys.Control | Keys.Shift)) != 0;
+                    marqueeBase = add ? new HashSet<CaptureItem>(Items.Where(i => i.Selected)) : new HashSet<CaptureItem>();
+                    if (!add) { foreach (var i in Items) i.Selected = false; RaiseSel(); }
+                    marquee = true;
+                    marqueeStart = marqueeEnd = c;
+                    Capture = true;
+                    if (marqueeScroll == null) { marqueeScroll = new System.Windows.Forms.Timer { Interval = 30 }; marqueeScroll.Tick += MarqueeScrollTick; }
+                    marqueeScroll.Start();
+                    Invalidate();
+                }
                 return;
             }
             if (e.Button == MouseButtons.Left)
@@ -197,6 +255,17 @@ namespace SnapStudio
         protected override void OnMouseUp(MouseEventArgs e)
         {
             base.OnMouseUp(e);
+            if (marquee && e.Button == MouseButtons.Left)
+            {
+                UpdateMarquee(e.Location);
+                marquee = false;
+                Capture = false;
+                if (marqueeScroll != null) marqueeScroll.Stop();
+                var first = Items.FirstOrDefault(i => i.Selected);
+                if (first != null) anchor = first;
+                Invalidate();
+                return;
+            }
             Point c = ToContent(e.Location);
             var it = ItemAt(c);
             if (e.Button == MouseButtons.Left && downItem != null && it == downItem && (ModifierKeys & (Keys.Control | Keys.Shift)) == 0)
@@ -274,6 +343,16 @@ namespace SnapStudio
                 {
                     if (!it.Bounds.IntersectsWith(view)) continue;
                     DrawCard(g, it, name, meta, badge);
+                }
+            }
+            if (marquee)
+            {
+                Rectangle r = MarqueeRect();
+                if (r.Width > 0 && r.Height > 0)
+                {
+                    g.SmoothingMode = SmoothingMode.None;
+                    using (var b = new SolidBrush(Color.FromArgb(40, Theme.Accent))) g.FillRectangle(b, r);
+                    using (var pen = new Pen(Color.FromArgb(200, Theme.Accent), 1)) g.DrawRectangle(pen, r);
                 }
             }
         }
