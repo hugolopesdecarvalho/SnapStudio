@@ -493,6 +493,14 @@ namespace SnapStudio
 
         public void Exit()
         {
+            // confirmar antes de sair: sem a aplicação, PrtScn e os atalhos deixam de funcionar
+            string text = recording != null
+                ? S.T("Está a gravar o ecrã. Parar a gravação e sair da SnapStudio?", "A screen recording is in progress. Stop it and exit SnapStudio?")
+                : S.T("Sair da SnapStudio?\n\nA tecla PrtScn e os atalhos de captura deixam de funcionar até voltar a abrir a aplicação.",
+                      "Exit SnapStudio?\n\nThe PrtScn key and the capture shortcuts will stop working until you open the app again.");
+            if (MessageBox.Show(text, "SnapStudio", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                return;
+
             if (recording != null) recording.StopAndWait();
             foreach (var e in editors.ToList())
             {
@@ -505,6 +513,7 @@ namespace SnapStudio
             tray.Visible = false;
             tray.Dispose();
             msg.Dispose();
+            ExitLog.Ended("user chose Exit");
             ExitThread();
         }
     }

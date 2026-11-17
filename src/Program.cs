@@ -45,6 +45,7 @@ namespace SnapStudio
             Application.ThreadException += (s, e) =>
             {
                 if (previewLog != null) { System.IO.File.AppendAllText(previewLog, e.Exception.ToString() + "\r\n"); return; }
+                ExitLog.Error(e.Exception);
                 MessageBox.Show(S.T("Ocorreu um erro inesperado:\n\n", "An unexpected error occurred:\n\n") + e.Exception.Message,
                                 "SnapStudio", MessageBoxButtons.OK, MessageBoxIcon.Error);
             };
@@ -136,6 +137,7 @@ namespace SnapStudio
                     Native.PostMessage(Native.HWND_BROADCAST, MessageWindow.WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
                     return 0;
                 }
+                ExitLog.Started();
                 var app = new TrayApp();
                 if (args.Length >= 2 && args[0] == "--edit") app.OpenEditor(args[1], null);
                 Application.Run(app);
