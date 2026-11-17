@@ -115,7 +115,7 @@ namespace SnapStudio
         /// (o texto é desenhado com NoPadding; medir com margem descentrava o conteúdo).</summary>
         static Size Measure(string text, Font font)
         {
-            return TextRenderer.MeasureText(text, font, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+            return TextRenderer.MeasureText(text, font, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -178,7 +178,7 @@ namespace SnapStudio
                 int total = (img != null ? isz : 0) + (th > 0 && img != null ? Px(4) : 0) + th;
                 int y = (Height - total) / 2;
                 if (img != null) { g.DrawImage(img, (Width - isz) / 2, y, isz, isz); y += isz + Px(4); }
-                if (th > 0) TextRenderer.DrawText(g, text, font, new Rectangle(0, y, Width, th), fg, TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPadding);
+                if (th > 0) TextRenderer.DrawText(g, text, font, new Rectangle(0, y, Width, th), fg, TextFormatFlags.NoPrefix | TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPadding);
             }
             else
             {
@@ -192,7 +192,7 @@ namespace SnapStudio
                 if (tw > 0)
                 {
                     TextRenderer.DrawText(g, text, font, new Rectangle(x, 0, Math.Max(0, Width - x - (left ? bw + Px(12) : 0)), Height), fg,
-                        TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
+                        TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
                     x += tw;
                 }
                 if (bw > 0)
@@ -201,10 +201,10 @@ namespace SnapStudio
                     {
                         var kr = new RectangleF(x + Px(10), (Height - Px(22)) / 2f, bw, Px(22));
                         Theme.FillRound(g, Color.FromArgb(50, 255, 255, 255), kr, Px(5));
-                        TextRenderer.DrawText(g, badge, bf, Rectangle.Round(kr), fg, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                        TextRenderer.DrawText(g, badge, bf, Rectangle.Round(kr), fg, TextFormatFlags.NoPrefix | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                     }
                     else
-                        TextRenderer.DrawText(g, badge, bf, new Rectangle(0, 0, Width - Px(12), Height), Theme.Muted, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
+                        TextRenderer.DrawText(g, badge, bf, new Rectangle(0, 0, Width - Px(12), Height), Theme.Muted, TextFormatFlags.NoPrefix | TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
                 }
             }
             PaintFocus(g, r, rad);
@@ -272,15 +272,15 @@ namespace SnapStudio
 
             var textRect = new Rectangle(0, 0, (int)track.X - Px(12), Height);
             if (string.IsNullOrEmpty(Subtitle))
-                TextRenderer.DrawText(g, Text, Font, textRect, Enabled ? Theme.Text : Theme.Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.NoPadding);
+                TextRenderer.DrawText(g, Text, Font, textRect, Enabled ? Theme.Text : Theme.Muted, TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.NoPadding);
             else
             {
                 int h1 = TextRenderer.MeasureText(Text, Font).Height;
                 Font sf = Theme.Font(12.5f * dpi);
                 int h2 = TextRenderer.MeasureText(Subtitle, sf).Height;
                 int y = (Height - h1 - h2 - Px(2)) / 2;
-                TextRenderer.DrawText(g, Text, Font, new Rectangle(0, y, textRect.Width, h1), Theme.Text, TextFormatFlags.Left | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
-                TextRenderer.DrawText(g, Subtitle, sf, new Rectangle(0, y + h1 + Px(2), textRect.Width, h2), Theme.Muted, TextFormatFlags.Left | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+                TextRenderer.DrawText(g, Text, Font, new Rectangle(0, y, textRect.Width, h1), Theme.Text, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+                TextRenderer.DrawText(g, Subtitle, sf, new Rectangle(0, y + h1 + Px(2), textRect.Width, h2), Theme.Muted, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
             }
             if (Focused && ShowFocusCues) Theme.StrokeRound(g, Theme.Accent, 2, new RectangleF(track.X - 2, track.Y - 2, track.Width + 4, track.Height + 4), th / 2f + 2);
         }
@@ -338,9 +338,9 @@ namespace SnapStudio
             if (isChecked) { var i = c; i.Inflate(-Px(4), -Px(4)); using (var b = new SolidBrush(Theme.Accent)) g.FillEllipse(b, i); }
             int x = Px(40);
             int h1 = TextRenderer.MeasureText(Text, Font).Height;
-            TextRenderer.DrawText(g, Text, Font, new Rectangle(x, Px(11), Width - x - Px(10), h1), Theme.Text, TextFormatFlags.Left | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(g, Text, Font, new Rectangle(x, Px(11), Width - x - Px(10), h1), Theme.Text, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
             if (!string.IsNullOrEmpty(Subtitle))
-                TextRenderer.DrawText(g, Subtitle, Theme.Font(12.5f * dpi), new Rectangle(x, Px(13) + h1, Width - x - Px(10), Height - Px(13) - h1), Theme.Muted, TextFormatFlags.Left | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+                TextRenderer.DrawText(g, Subtitle, Theme.Font(12.5f * dpi), new Rectangle(x, Px(13) + h1, Width - x - Px(10), Height - Px(13) - h1), Theme.Muted, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
             PaintFocus(g, r, Px(8));
         }
     }
@@ -374,7 +374,7 @@ namespace SnapStudio
             var c = new RectangleF(Px(12), Height - Px(28), d, d);
             using (var p = new Pen(Checked ? Theme.Accent : Theme.Muted, 1.6f)) g.DrawEllipse(p, c);
             if (Checked) { var i = c; i.Inflate(-Px(4), -Px(4)); using (var b = new SolidBrush(Theme.Accent)) g.FillEllipse(b, i); }
-            TextRenderer.DrawText(g, Text, Theme.Font(13.5f * dpi, FontStyle.Bold), new Rectangle(Px(36), Height - Px(34), Width - Px(40), Px(28)), Theme.Text, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.NoPadding);
+            TextRenderer.DrawText(g, Text, Theme.Font(13.5f * dpi, FontStyle.Bold), new Rectangle(Px(36), Height - Px(34), Width - Px(40), Px(28)), Theme.Text, TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.NoPadding);
             PaintFocus(g, r, Px(10));
         }
 

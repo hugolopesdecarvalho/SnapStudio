@@ -168,7 +168,7 @@ namespace SnapStudio
             y = Px(80);
             Section(pAfter, S.T("Abrir", "Open"), ref y);
             string[][] opts = {
-                new[] { "quick", S.T("Editor rápido (pop-up junto ao relógio)", "Quick editor (pop-up next to the clock)"), S.T("Seta, caixa, texto e esbater à mão; Copiar e fechar", "Arrow, box, text and blur at hand; Copy and close") },
+                new[] { "quick", S.T("Editor rápido (pop-up junto ao relógio)", "Quick editor (pop-up next to the clock)"), S.T("Seta, caixa, texto e esbater à mão; Fechar e copiar", "Arrow, box, text and blur at hand; Close & Copy") },
                 new[] { "full", S.T("Editor completo", "Full editor"), S.T("Janela grande com todas as ferramentas", "Large window with every tool") },
                 new[] { "none", S.T("Nada — só guardar e copiar", "Nothing — just save and copy"), S.T("Mostra uma notificação; clique nela para editar", "Shows a notification; click it to edit") } };
             foreach (var o in opts)

@@ -37,7 +37,7 @@
         <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/quick-editor-dark.png">
         <img src="assets/screenshots/quick-editor-light.png" alt="Quick editor pop-up with a pixelated password field and an arrow">
       </picture>
-      <p align="center"><b>Quick editor</b><br>Annotate, copy and close in seconds.</p>
+      <p align="center"><b>Quick editor</b><br>Annotate, close & copy in seconds.</p>
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/history-dark.png">
         <img src="assets/screenshots/history-light.png" alt="Capture history grouped by day, with search and filters">
@@ -93,7 +93,7 @@ In capture mode: click a window, drag a region, **Enter** = full screen, **A** =
 
 ### After a capture
 The image is saved to `Pictures/SnapStudio` and copied to the clipboard. Depending on *Settings › After capture*, it then opens in:
-- **Quick editor**: a pop-up next to the tray / menu bar with the most-used tools and *Copy and close*. Esc or clicking outside saves and closes. It is only used right after a capture; opening a capture from the panel, the history or a notification always uses the full editor.
+- **Quick editor**: a pop-up next to the tray / menu bar with the most-used tools and *Close & Copy*. Esc or clicking outside saves and closes. It is only used right after a capture; opening a capture from the panel, the history or a notification always uses the full editor.
 - **Full editor**: all tools, properties (color, width, text size) and the annotation list.
 - **Nothing**: just save and copy, with a notification.
 
@@ -104,12 +104,12 @@ Tool keys (same on both platforms): Select (V), Arrow (A), Box (R), Text (T), **
 |---|---|---|
 | Save / Save as | Ctrl+S / Ctrl+Shift+S | ⌘S / ⇧⌘S |
 | Copy image | Ctrl+C | ⌘C |
-| Copy and close (saves changes) | Ctrl+Enter | ⌘↩ |
+| Close & Copy (saves changes) | Ctrl+Enter | ⌘↩ |
 | Undo / Redo | Ctrl+Z / Ctrl+Y | ⌘Z / ⇧⌘Z |
 | Delete annotation | Delete | ⌫ |
 | Zoom | Ctrl+wheel | pinch or ⌘+wheel |
 
-Changes are always saved when the editor closes; **Copy and close** saves, copies the image and closes in one step. Hold Shift while drawing for 45° angles and squares. Use the **Drag** button to drop the image straight into another app.
+Changes are always saved when the editor closes; **Close & Copy** saves, copies the image and closes in one step. Hold Shift while drawing for 45° angles and squares. Use the **Drag** button to drop the image straight into another app.
 
 Use **‹ ›** in the full editor's header, or Ctrl+← / Ctrl+→ on Windows and ⌘← / ⌘→ on macOS, to move to the previous or next capture in the same folder, oldest to newest. Changes are saved before switching.
 

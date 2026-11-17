@@ -424,7 +424,7 @@ namespace SnapStudio
             btnPrev.Size = btnNext.Size = new Size(Px(36), Px(40));
             lblNav = new ThemedLabel { Font = Theme.Font(12.5f * dpi), AutoSize = false, TextAlign = ContentAlignment.MiddleCenter, Size = new Size(Px(64), Px(40)) }.Muted();
             header.Controls.Add(lblNav);
-            var btnCopy = Btn(header, BtnKind.Primary, "copy", S.T("Copiar e fechar", "Copy and close"), S.T("Guardar as alterações, copiar a imagem e fechar (Ctrl+Enter)", "Save changes, copy the image and close (Ctrl+Enter)"), delegate { CopyAndClose(); });
+            var btnCopy = Btn(header, BtnKind.Primary, "copy", S.T("Fechar e copiar", "Close & Copy"), S.T("Guardar as alterações, copiar a imagem e fechar (Ctrl+Enter)", "Save changes, copy the image and close (Ctrl+Enter)"), delegate { CopyAndClose(); });
             var btnSaveAs = Btn(header, BtnKind.Secondary, null, S.T("Guardar como…", "Save as…"), S.T("Guardar como (Ctrl+Shift+S)", "Save as (Ctrl+Shift+S)"), delegate { SaveAs(); });
             var btnDrag = Btn(header, BtnKind.Secondary, "drag", S.T("Arrastar", "Drag"), S.T("Arraste para o Outlook, Teams ou Explorador", "Drag into Outlook, Teams or Explorer"), null);
             btnDrag.MouseDown += DragButton_MouseDown;
@@ -676,7 +676,7 @@ namespace SnapStudio
             var footer = new ThemedPanel { Dock = DockStyle.Bottom, Height = Px(64), BorderTop = true, Back = () => Theme.Panel };
             var bFull = Btn(footer, BtnKind.Secondary, "expand", S.T("Editor completo", "Full editor"), S.T("Abrir no editor completo", "Open in the full editor"), delegate { OpenFullEditor(); });
             var bDiscard = Btn(footer, BtnKind.Danger, null, S.T("Descartar", "Discard"), S.T("Enviar esta captura para a Reciclagem", "Send this capture to the Recycle Bin"), delegate { Discard(); });
-            var bCopy = Btn(footer, BtnKind.Primary, "copy", S.T("Copiar e fechar", "Copy and close"), S.T("Copiar a imagem anotada e fechar", "Copy the annotated image and close"), delegate { CopyAndClose(); });
+            var bCopy = Btn(footer, BtnKind.Primary, "copy", S.T("Fechar e copiar", "Close & Copy"), S.T("Copiar a imagem anotada e fechar", "Copy the annotated image and close"), delegate { CopyAndClose(); });
             var bSaveAs = Btn(footer, BtnKind.Secondary, null, S.T("Guardar como…", "Save as…"), null, delegate { SaveAs(); });
             foreach (var b in new[] { bFull, bDiscard, bCopy, bSaveAs }) b.Size = new Size(b.PreferredWidth, Px(40));
             bFull.Location = new Point(Px(14), Px(12));
@@ -1169,6 +1169,47 @@ namespace SnapStudio
             cacheDirty = true;
         }
 
+        /// <summary>Extremo (pega) debaixo do ponto: primeiro os do elemento selecionado (qualquer forma),
+        /// depois as pontas de setas e linhas, de cima para baixo. A ponta (P2) ganha à cauda.</summary>
+        ShapeAnn EndpointAt(PointF p, float tol, out bool second)
+        {
+            float r = tol * 1.5f;
+            second = false;
+            var sel = selected as ShapeAnn;
+            if (sel != null && anns.Contains(sel))
+            {
+                if (Ann.Dist(p, sel.P2) <= r) { second = true; return sel; }
+                if (Ann.Dist(p, sel.P1) <= r) return sel;
+            }
+            for (int i = anns.Count - 1; i >= 0; i--)
+            {
+                var sh = anns[i] as ShapeAnn;
+                if (sh == null || !sh.IsLinear) continue;
+                if (Ann.Dist(p, sh.P2) <= r) { second = true; return sh; }
+                if (Ann.Dist(p, sh.P1) <= r) return sh;
+            }
+            return null;
+        }
+
+        /// <summary>Começa a arrastar um extremo de seta/linha (ou do elemento selecionado), selecionando-o.</summary>
+        bool GrabEndpoint(PointF p, float tol, bool switchToSelect)
+        {
+            bool second;
+            var sh = EndpointAt(p, tol, out second);
+            if (sh == null) return false;
+            if (switchToSelect) SetTool(Tool.Select);
+            if (selected != sh)
+            {
+                selected = sh;
+                SyncPropsFromSelection();
+                SelectionChanged();
+            }
+            BeginEdit(sh);
+            drag = second ? Drag.Handle2 : Drag.Handle1;
+            Dirty();
+            return true;
+        }
+
         void Canvas_MouseDown(object sender, MouseEventArgs e)
         {
             if (textBox != null) { CommitText(); return; }
@@ -1182,12 +1223,7 @@ namespace SnapStudio
             {
                 case Tool.Select:
                     {
-                        var sh = selected as ShapeAnn;
-                        if (sh != null && anns.Contains(sh))
-                        {
-                            if (Ann.Dist(p, sh.P1) <= tol * 1.5f) { BeginEdit(sh); drag = Drag.Handle1; canvas.Invalidate(); return; }
-                            if (Ann.Dist(p, sh.P2) <= tol * 1.5f) { BeginEdit(sh); drag = Drag.Handle2; canvas.Invalidate(); return; }
-                        }
+                        if (GrabEndpoint(p, tol, false)) return;
                         selected = HitTest(p, tol);
                         if (selected != null) { BeginEdit(selected); drag = Drag.Move; }
                         SyncPropsFromSelection();
@@ -1222,6 +1258,8 @@ namespace SnapStudio
                     break;
                 default:
                     {
+                        // com a seta/linha ativa, carregar na ponta de uma seta existente arrasta essa ponta
+                        if ((tool == Tool.Arrow || tool == Tool.Line) && GrabEndpoint(p, tol, true)) return;
                         var sa = new ShapeAnn { Kind = KindFor(tool), X1 = p.X, Y1 = p.Y, X2 = p.X, Y2 = p.Y, Width = curWidth, Color = tool == Tool.Highlight ? HighlightColor : curColor };
                         if (curRounded && sa.IsRoundable) sa.Radius = curRadius;
                         if (curFillOn && (sa.Kind == "rect" || sa.Kind == "ellipse")) sa.Fill = curFill;
@@ -1365,9 +1403,14 @@ namespace SnapStudio
             {
                 c = Cursors.Default;
                 float tol = 6 * dpi / zoom;
-                var sh = selected as ShapeAnn;
-                if (sh != null && (Ann.Dist(p, sh.P1) <= tol * 1.5f || Ann.Dist(p, sh.P2) <= tol * 1.5f)) c = Cursors.Cross;
+                bool second;
+                if (EndpointAt(p, tol, out second) != null) c = Cursors.Cross;
                 else if (HitTest(p, tol) != null) c = Cursors.SizeAll;
+            }
+            else if (tool == Tool.Arrow || tool == Tool.Line)
+            {
+                bool second;
+                if (EndpointAt(p, 6 * dpi / zoom, out second) != null) c = Cursors.Hand;
             }
             else if (tool == Tool.Text) c = Cursors.IBeam;
             if (canvas.Cursor != c) canvas.Cursor = c;

@@ -336,7 +336,7 @@ struct FullEditorView: View {
             Spacer()
             DragHandle(model: model)
             Button(S.t("Guardar como…", "Save as…")) { controller.saveAs() }
-            Button { controller.copyAndClose() } label: { Label(S.t("Copiar e fechar", "Copy and close"), systemImage: "doc.on.doc") }
+            Button { controller.copyAndClose() } label: { Label(S.t("Fechar e copiar", "Close & Copy"), systemImage: "doc.on.doc") }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.return, modifiers: .command)
                 .help(S.t("Guardar as alterações, copiar a imagem e fechar (⌘↩)", "Save changes, copy the image and close (⌘↩)"))
@@ -535,7 +535,7 @@ struct QuickEditorView: View {
                     .help(S.t("Enviar esta captura para o Lixo", "Move this capture to the Trash"))
                 Spacer()
                 Button(S.t("Guardar como…", "Save as…")) { controller.saveAs() }
-                Button { controller.copyAndClose() } label: { Label(S.t("Copiar e fechar", "Copy and close"), systemImage: "doc.on.doc") }
+                Button { controller.copyAndClose() } label: { Label(S.t("Fechar e copiar", "Close & Copy"), systemImage: "doc.on.doc") }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.return, modifiers: .command)
                     .help(S.t("Copiar a imagem anotada e fechar (⌘↩)", "Copy the annotated image and close (⌘↩)"))
