@@ -346,7 +346,7 @@ struct TrayPanelView: View {
             }
             .buttonStyle(.plain)
             .help(S.t("Versão e atualizações", "Version and updates"))
-            footerButton(S.t("Sair", "Exit")) { NSApp.terminate(nil) }
+            footerButton(S.t("Sair", "Exit")) { app.confirmQuit() }
         }
         .padding(.horizontal, 10)
         .frame(height: 52)

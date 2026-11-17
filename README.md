@@ -104,11 +104,12 @@ Tool keys (same on both platforms): Select (V), Arrow (A), Box (R), Text (T), **
 |---|---|---|
 | Save / Save as | Ctrl+S / Ctrl+Shift+S | ⌘S / ⇧⌘S |
 | Copy image | Ctrl+C | ⌘C |
+| Copy and close (saves changes) | Ctrl+Enter | ⌘↩ |
 | Undo / Redo | Ctrl+Z / Ctrl+Y | ⌘Z / ⇧⌘Z |
 | Delete annotation | Delete | ⌫ |
 | Zoom | Ctrl+wheel | pinch or ⌘+wheel |
 
-Hold Shift while drawing for 45° angles and squares. Use the **Drag** button to drop the image straight into another app.
+Changes are always saved when the editor closes; **Copy and close** saves, copies the image and closes in one step. Hold Shift while drawing for 45° angles and squares. Use the **Drag** button to drop the image straight into another app.
 
 Use **‹ ›** in the full editor's header, or Ctrl+← / Ctrl+→ on Windows and ⌘← / ⌘→ on macOS, to move to the previous or next capture in the same folder, oldest to newest. Changes are saved before switching.
 

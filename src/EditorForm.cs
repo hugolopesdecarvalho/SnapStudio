@@ -424,9 +424,8 @@ namespace SnapStudio
             btnPrev.Size = btnNext.Size = new Size(Px(36), Px(40));
             lblNav = new ThemedLabel { Font = Theme.Font(12.5f * dpi), AutoSize = false, TextAlign = ContentAlignment.MiddleCenter, Size = new Size(Px(64), Px(40)) }.Muted();
             header.Controls.Add(lblNav);
-            var btnCopy = Btn(header, BtnKind.Primary, "copy", S.T("Copiar", "Copy"), S.T("Copiar imagem (Ctrl+C)", "Copy image (Ctrl+C)"), delegate { CopyToClipboard(true); });
+            var btnCopy = Btn(header, BtnKind.Primary, "copy", S.T("Copiar e fechar", "Copy and close"), S.T("Guardar as alterações, copiar a imagem e fechar (Ctrl+Enter)", "Save changes, copy the image and close (Ctrl+Enter)"), delegate { CopyAndClose(); });
             var btnSaveAs = Btn(header, BtnKind.Secondary, null, S.T("Guardar como…", "Save as…"), S.T("Guardar como (Ctrl+Shift+S)", "Save as (Ctrl+Shift+S)"), delegate { SaveAs(); });
-            var btnSave = Btn(header, BtnKind.Secondary, "save", S.T("Guardar", "Save"), S.T("Guardar (Ctrl+S)", "Save (Ctrl+S)"), delegate { Save(); });
             var btnDrag = Btn(header, BtnKind.Secondary, "drag", S.T("Arrastar", "Drag"), S.T("Arraste para o Outlook, Teams ou Explorador", "Drag into Outlook, Teams or Explorer"), null);
             btnDrag.MouseDown += DragButton_MouseDown;
             btnDrag.Cursor = Cursors.SizeAll;
@@ -442,7 +441,7 @@ namespace SnapStudio
                 lblNav.Location = new Point(btnPrev.Right, Px(8));
                 btnNext.Location = new Point(lblNav.Right, Px(8));
                 int x = header.Width - Px(12);
-                foreach (var b in new[] { btnCopy, btnSaveAs, btnSave, btnDrag })
+                foreach (var b in new[] { btnCopy, btnSaveAs, btnDrag })
                 {
                     b.Size = new Size(b.PreferredWidth, Px(40));
                     x -= b.Width;
@@ -1871,7 +1870,7 @@ namespace SnapStudio
         {
             CommitText();
             CopyToClipboard(false);
-            if (modified) Save();
+            if (modified && !Save() && !compact) return; // no editor completo, não fechar se não conseguiu guardar
             quietClose = true;
             Close();
         }
@@ -1912,17 +1911,9 @@ namespace SnapStudio
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             CommitText();
-            if (compact || quietClose)
-            {
-                if (modified) Save();
-            }
-            else if (modified && e.CloseReason != CloseReason.WindowsShutDown)
-            {
-                var r = MessageBox.Show(this, S.T("Guardar as alterações a ", "Save changes to ") + Path.GetFileName(filePath) + "?",
-                                        "SnapStudio", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
-                if (r == DialogResult.Cancel || (r == DialogResult.Yes && !Save())) { e.Cancel = true; return; }
-            }
-            else if (modified) Save();
+            // as alterações são sempre guardadas ao fechar (sem perguntar);
+            // no editor completo, se não for possível guardar, a janela fica aberta
+            if (modified && !Save() && !compact && !quietClose && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; return; }
             base.OnFormClosing(e);
         }
 
@@ -1954,6 +1945,7 @@ namespace SnapStudio
                 case Keys.Control | Keys.S: Save(); return true;
                 case Keys.Control | Keys.Shift | Keys.S: SaveAs(); return true;
                 case Keys.Control | Keys.C: CopyToClipboard(true); return true;
+                case Keys.Control | Keys.Enter: CopyAndClose(); return true;
                 case Keys.Control | Keys.Z: Undo(); return true;
                 case Keys.Control | Keys.Y:
                 case Keys.Control | Keys.Shift | Keys.Z: Redo(); return true;

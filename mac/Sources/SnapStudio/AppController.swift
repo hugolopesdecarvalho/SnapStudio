@@ -168,6 +168,25 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
 
     func closePanel() { panel?.hide() }
 
+    /// Pergunta antes de sair: sem a app, os atalhos de captura deixam de funcionar.
+    /// (Encerrar/terminar sessão no macOS não passa por aqui.)
+    func confirmQuit() {
+        closePanel()
+        let a = NSAlert()
+        a.messageText = recording != nil
+            ? S.t("Está a gravar o ecrã. Parar a gravação e sair da SnapStudio?", "A screen recording is in progress. Stop it and quit SnapStudio?")
+            : S.t("Sair da SnapStudio?", "Quit SnapStudio?")
+        a.informativeText = S.t("Os atalhos de captura deixam de funcionar até voltar a abrir a aplicação.",
+                                "The capture shortcuts will stop working until you open the app again.")
+        a.addButton(withTitle: S.t("Sair", "Quit"))
+        a.addButton(withTitle: S.t("Cancelar", "Cancel"))
+        // Enter = Cancelar, para não sair sem querer
+        a.buttons[0].keyEquivalent = ""
+        a.buttons[1].keyEquivalent = "\r"
+        NSApp.activate(ignoringOtherApps: true)
+        if a.runModal() == .alertFirstButtonReturn { NSApp.terminate(nil) }
+    }
+
     private func buildStatusMenu() -> NSMenu {
         let m = NSMenu()
         func item(_ title: String, _ symbol: String?, _ key: Hotkey? = nil, _ action: @escaping () -> Void) -> NSMenuItem {
@@ -211,7 +230,7 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
             })
         }
         m.addItem(.separator())
-        m.addItem(item(S.t("Sair da SnapStudio", "Quit SnapStudio"), nil) { NSApp.terminate(nil) })
+        m.addItem(item(S.t("Sair da SnapStudio", "Quit SnapStudio"), nil) { [weak self] in self?.confirmQuit() })
         return m
     }
 
@@ -248,7 +267,7 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
         closure(appMenu, S.t("Definições…", "Settings…"), ",") { [weak self] in self?.showSettings() }
         appMenu.addItem(.separator())
         add(appMenu, S.t("Ocultar a SnapStudio", "Hide SnapStudio"), #selector(NSApplication.hide(_:)), "h")
-        add(appMenu, S.t("Sair da SnapStudio", "Quit SnapStudio"), #selector(NSApplication.terminate(_:)), "q")
+        closure(appMenu, S.t("Sair da SnapStudio", "Quit SnapStudio"), "q") { [weak self] in self?.confirmQuit() }
         let appItem = NSMenuItem(); appItem.submenu = appMenu; main.addItem(appItem)
 
         let file = NSMenu(title: S.t("Ficheiro", "File"))

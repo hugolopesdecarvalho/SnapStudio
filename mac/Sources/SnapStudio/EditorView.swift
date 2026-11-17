@@ -135,23 +135,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         model.canvas?.commitText()
         if quietClose || model.compact || !model.modified { return true }
-        let a = NSAlert()
-        a.messageText = S.t("Guardar as alterações em “\(model.fileURL.lastPathComponent)”?", "Save changes to “\(model.fileURL.lastPathComponent)”?")
-        a.informativeText = S.t("As anotações continuam editáveis ao reabrir a captura.", "Annotations stay editable when you reopen the capture.")
-        a.addButton(withTitle: S.t("Guardar", "Save"))
-        a.addButton(withTitle: S.t("Cancelar", "Cancel"))
-        a.addButton(withTitle: S.t("Não guardar", "Don't Save"))
-        model.dialogOpen = true
-        a.beginSheetModal(for: sender) { [weak self] r in
-            guard let self = self else { return }
-            self.model.dialogOpen = false
-            switch r {
-            case .alertFirstButtonReturn: if self.model.save() { self.quietClose = true; sender.close() }
-            case .alertThirdButtonReturn: self.quietClose = true; sender.close()
-            default: break
-            }
-        }
-        return false
+        // as alterações são sempre guardadas ao fechar; se não for possível, a janela fica aberta
+        return model.save()
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -183,8 +168,9 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func copyAndClose() {
+        model.canvas?.commitText()
         model.copyToClipboard(notify: false)
-        if model.modified { model.save() }
+        if model.modified && !model.save() && !model.compact { return }
         quietClose = true
         window?.close()
     }
@@ -350,11 +336,10 @@ struct FullEditorView: View {
             Spacer()
             DragHandle(model: model)
             Button(S.t("Guardar como…", "Save as…")) { controller.saveAs() }
-            Button { model.save() } label: { Label(S.t("Guardar", "Save"), systemImage: "square.and.arrow.down") }
-                .help(S.t("Guardar (⌘S)", "Save (⌘S)"))
-            Button { model.copyToClipboard(notify: true) } label: { Label(S.t("Copiar", "Copy"), systemImage: "doc.on.doc") }
+            Button { controller.copyAndClose() } label: { Label(S.t("Copiar e fechar", "Copy and close"), systemImage: "doc.on.doc") }
                 .buttonStyle(.borderedProminent)
-                .help(S.t("Copiar imagem (⌘C)", "Copy image (⌘C)"))
+                .keyboardShortcut(.return, modifiers: .command)
+                .help(S.t("Guardar as alterações, copiar a imagem e fechar (⌘↩)", "Save changes, copy the image and close (⌘↩)"))
             IconButton(symbol: Theme.isDark ? "sun.max" : "moon", help: S.t("Mudar tema", "Toggle theme")) { controller.toggleTheme() }
         }
         .padding(.horizontal, 12)
