@@ -129,15 +129,52 @@ final class CanvasView: NSView, NSTextViewDelegate, NSMenuItemValidation {
     }
 
     override func mouseMoved(with event: NSEvent) {
-        guard model.tool == .select, drag == .none else { return }
+        guard drag == .none else { return }
         let p = toImg(event)
-        if let s = model.selected, s.isShape, Geo.dist(p, s.p1) <= tol * 1.5 || Geo.dist(p, s.p2) <= tol * 1.5 {
-            NSCursor.crosshair.set()
-        } else if model.hitTest(p, tol: tol) != nil {
-            NSCursor.openHand.set()
-        } else {
-            NSCursor.arrow.set()
+        switch model.tool {
+        case .select:
+            if endpoint(at: p) != nil {
+                NSCursor.crosshair.set()
+            } else if model.hitTest(p, tol: tol) != nil {
+                NSCursor.openHand.set()
+            } else {
+                NSCursor.arrow.set()
+            }
+        case .arrow, .line:
+            (endpoint(at: p) != nil ? NSCursor.pointingHand : NSCursor.crosshair).set()
+        default:
+            return
         }
+    }
+
+    /// Extremo (pega) debaixo do ponto: primeiro os do elemento selecionado (qualquer forma),
+    /// depois as pontas de setas e linhas, de cima para baixo. A ponta (p2) ganha à cauda.
+    private func endpoint(at p: CGPoint) -> (ann: Ann, head: Bool)? {
+        let r = tol * 1.5
+        if let s = model.selected, s.isShape {
+            if Geo.dist(p, s.p2) <= r { return (s, true) }
+            if Geo.dist(p, s.p1) <= r { return (s, false) }
+        }
+        for a in model.anns.reversed() where a.isLinear {
+            if Geo.dist(p, a.p2) <= r { return (a, true) }
+            if Geo.dist(p, a.p1) <= r { return (a, false) }
+        }
+        return nil
+    }
+
+    /// Começa a arrastar um extremo de seta/linha (ou do elemento selecionado), selecionando-o.
+    private func grabEndpoint(_ p: CGPoint, switchToSelect: Bool) -> Bool {
+        guard let hit = endpoint(at: p) else { return false }
+        if switchToSelect { model.setTool(.select) }
+        if model.selectedID != hit.ann.id {
+            model.selectedID = hit.ann.id
+            model.syncPropsFromSelection()
+        }
+        model.beginEdit()
+        model.live = hit.ann
+        drag = hit.head ? .handle2 : .handle1
+        model.changed()
+        return true
     }
 
     // ================= rato =================
@@ -155,10 +192,7 @@ final class CanvasView: NSView, NSTextViewDelegate, NSMenuItemValidation {
 
         switch model.tool {
         case .select:
-            if let s = model.selected, s.isShape {
-                if Geo.dist(p, s.p1) <= tol * 1.5 { model.beginEdit(); model.live = s; drag = .handle1; needsDisplay = true; return }
-                if Geo.dist(p, s.p2) <= tol * 1.5 { model.beginEdit(); model.live = s; drag = .handle2; needsDisplay = true; return }
-            }
+            if grabEndpoint(p, switchToSelect: false) { return }
             let hit = model.hitTest(p, tol: tol)
             model.selectedID = hit?.id
             if hit != nil { model.beginEdit(); drag = .move; NSCursor.closedHand.set() }
@@ -184,6 +218,8 @@ final class CanvasView: NSView, NSTextViewDelegate, NSMenuItemValidation {
             drag = .crop
             model.cropRect = CGRect(origin: p, size: .zero)
         default:
+            // com a seta/linha ativa, carregar na ponta de uma seta existente arrasta essa ponta
+            if model.tool == .arrow || model.tool == .line, grabEndpoint(p, switchToSelect: true) { return }
             guard let k = model.tool.shapeKind else { return }
             let sa = Ann(kind: k, argb: model.tool == .highlight ? ArgbColor.highlight : model.color)
             sa.p1 = p; sa.p2 = p
