@@ -431,8 +431,10 @@ namespace SnapStudio
                 var sc = new StringCollection();
                 sc.AddRange(paths.ToArray());
                 data.SetFileDropList(sc);
-                if (paths.Count == 1 && !VideoFile.Is(paths[0])) data.SetImage(ImageUtil.LoadNoLock(paths[0]));
-                Clipboard.SetDataObject(data, true, 5, 100);
+                Image img = paths.Count == 1 && !VideoFile.Is(paths[0]) ? ImageUtil.LoadNoLock(paths[0]) : null;
+                if (img != null) data.SetImage(img);
+                Clipboard.SetDataObject(data, true, 5, 100);   // copy=true: a área de transferência fica com uma cópia
+                if (img != null) img.Dispose();
             }
             catch (Exception ex) { Ask(ex.Message, MessageBoxButtons.OK); }
         }
