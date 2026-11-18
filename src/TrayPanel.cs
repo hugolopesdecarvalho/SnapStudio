@@ -1,92 +1,40 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
+using Microsoft.VisualBasic.FileIO;
 
 namespace SnapStudio
 {
-    /// <summary>Miniatura clicável de uma captura recente.</summary>
-    class ThumbTile : ThemedControl
-    {
-        public string Path;
-        public string Caption;
-        public Bitmap Image;
-
-        public ThumbTile()
-        {
-            SetStyle(ControlStyles.Selectable | ControlStyles.StandardClick, true);
-            TabStop = true;
-            Cursor = Cursors.Hand;
-        }
-
-        protected override void OnKeyDown(KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Enter || e.KeyCode == Keys.Space) { OnClick(EventArgs.Empty); e.Handled = true; }
-            base.OnKeyDown(e);
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            Graphics g = e.Graphics;
-            g.Clear(ParentBack);
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            var r = new RectangleF(0.5f, 0.5f, Width - 1, Height - 1);
-            float rad = Px(8);
-            if (Path == null)
-            {
-                using (var pen = new Pen(Theme.Border) { DashStyle = DashStyle.Dash }) using (var p = Theme.Round(r, rad)) g.DrawPath(pen, p);
-                return;
-            }
-            Theme.FillRound(g, Theme.Surface, r, rad);
-            int ih = Height - Px(24);
-            var st = g.Save();
-            using (var clip = Theme.Round(r, rad)) g.SetClip(clip);
-            var ir = new Rectangle(0, 0, Width, ih);
-            using (var b = new SolidBrush(Theme.Surface2)) g.FillRectangle(b, ir);
-            if (Image != null)
-            {
-                // "cobrir": preenche a área sem deformar, alinhado ao topo
-                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                float sc = Math.Max(ir.Width / (float)Image.Width, ir.Height / (float)Image.Height);
-                float w = Image.Width * sc, h = Image.Height * sc;
-                g.DrawImage(Image, new RectangleF((ir.Width - w) / 2f, 0, w, h));
-            }
-            g.Restore(st);
-            using (var p = new Pen(Theme.Border)) g.DrawLine(p, 0, ih, Width, ih);
-            TextRenderer.DrawText(g, Caption, Theme.Font(11.5f * dpi), new Rectangle(Px(7), ih, Width - Px(10), Px(24)), Theme.Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
-            Theme.StrokeRound(g, hover ? Theme.Accent : Theme.Border, hover ? 1.5f : 1f, r, rad);
-            PaintFocus(g, r, rad);
-        }
-    }
-
     /// <summary>
     /// Painel que abre por cima do relógio ao clicar no ícone da bandeja.
     /// Redimensionável pelas bordas de cima e da esquerda; o tamanho fica guardado.
     /// </summary>
     class TrayPanel : Form
     {
-        const int DefaultW = 460, DefaultH = 620, MinW = 360, MinH = 500, MaxTiles = 40;
+        const int DefaultW = 460, DefaultH = 620, MinW = 360, MinH = 500;
+        static readonly string[] Exts = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".mp4" };
 
         readonly float dpi;
-        readonly FlatButton btnTheme, btnSettings, btnCapture, btnRecord, btnFull, btnWindow, btnDelay, btnHistory, btnOpen, btnFolder, btnExit;
+        readonly FlatButton btnTheme, btnSettings, btnCapture, btnRecord, btnFull, btnWindow, btnDelay, btnDelete, btnOpen, btnFolder, btnExit;
         readonly ToggleRow swEditor;
         readonly ThemedPanel footer;
-        readonly List<ThumbTile> tiles = new List<ThumbTile>();
+        readonly CaptureGrid grid;
         readonly ToolTip tips = new ToolTip();
         int yLine1, yRecent, yClip, yLine2, yFooter;
-        int visibleTiles;
-        Size tileSize;
+        bool dialogOpen;
         bool clipVisible;
         readonly ThemedLabel lblVersion;
         RectangleF clipRect;
         DateTime lastHidden = DateTime.MinValue;
 
         static readonly Dictionary<string, Bitmap> thumbCache = new Dictionary<string, Bitmap>();
-        int loadVersion;
+        volatile int loadVersion;
 
         int Px(float v) { return (int)Math.Round(v * dpi); }
 
@@ -122,9 +70,18 @@ namespace SnapStudio
             btnDelay = Compact("timer", S.T("Atraso 3 s", "3 s delay"), S.T("Modo captura daqui a 3 segundos", "Capture mode in 3 seconds"));
             btnDelay.Click += delegate { DoCapture(CaptureMode.Region, 3000); };
 
-            btnHistory = new FlatButton { Kind = BtnKind.Ghost, Text = S.T("Ver histórico", "View history"), Font = Theme.Font(13 * dpi) };
-            btnHistory.Size = new Size(btnHistory.PreferredWidth, Px(28));
-            btnHistory.Click += delegate { HideNow(); TrayApp.Instance.ShowHistory(); };
+            // todas as capturas da pasta: clique seleciona, arrastar seleciona várias, duplo clique abre
+            grid = new CaptureGrid(thumbCache)
+            {
+                EmptyText = S.T("Ainda não há capturas.\nPrima PrtScn para fazer a primeira.", "No captures yet.\nPress PrtScn to take your first one."),
+                CaptionOf = it => Ago(it.Time),
+            };
+            grid.OpenItem += it => { HideNow(); TrayApp.Instance.OpenEditor(it.Path, null); };
+            grid.MenuRequested += ShowMenu;
+            grid.SelectionChanged += UpdateSelectionUi;
+            btnDelete = new FlatButton { Kind = BtnKind.Ghost, IconName = "delete", Font = Theme.Font(12.5f * dpi), Visible = false };
+            btnDelete.Click += delegate { DeletePaths(SelectedPaths()); };
+            tips.SetToolTip(btnDelete, S.T("Enviar as capturas selecionadas para a Reciclagem (Delete)", "Send the selected captures to the Recycle Bin (Delete)"));
 
             swEditor = new ToggleRow { Text = S.T("Abrir no editor depois de capturar", "Open in the editor after capture") };
             swEditor.CheckedChanged += delegate
@@ -150,7 +107,7 @@ namespace SnapStudio
             tips.SetToolTip(lblVersion, S.T("Versão e atualizações", "Version and updates"));
             footer.Controls.AddRange(new Control[] { btnOpen, btnFolder, btnExit, lblVersion });
 
-            Controls.AddRange(new Control[] { btnTheme, btnSettings, btnCapture, btnRecord, btnFull, btnWindow, btnDelay, btnHistory, swEditor, footer });
+            Controls.AddRange(new Control[] { btnTheme, btnSettings, btnCapture, btnRecord, btnFull, btnWindow, btnDelay, btnDelete, grid, swEditor, footer });
 
             var st0 = TrayApp.Instance != null ? TrayApp.Instance.Settings : null;
             int w = st0 != null && st0.PanelWidth > 0 ? st0.PanelWidth : DefaultW;
@@ -174,7 +131,7 @@ namespace SnapStudio
         void DoLayout()
         {
             if (btnCapture == null) return;
-            int W = ClientSize.Width, H = ClientSize.Height, pad = Px(14), gap = Px(8);
+            int W = ClientSize.Width, H = ClientSize.Height, pad = Px(14);
 
             btnSettings.Location = new Point(W - pad - Px(36), Px(10));
             btnTheme.Location = new Point(W - pad - Px(76), Px(10));
@@ -193,8 +150,8 @@ namespace SnapStudio
             yLine1 = y;
             y += Px(10);
             yRecent = y;
-            btnHistory.Location = new Point(W - pad - btnHistory.Width, y - Px(2));
-            y += Px(32);
+            btnDelete.Location = new Point(W - pad - btnDelete.Width, y - Px(2));
+            y += Px(30);
 
             // parte de baixo, fixa
             int footerH = Px(52);
@@ -208,36 +165,9 @@ namespace SnapStudio
             lblVersion.Location = new Point(btnExit.Left - Px(10) - lblVersion.Width, (footerH - lblVersion.Height) / 2);
             swEditor.Bounds = new Rectangle(Px(16), yLine2, W - 2 * Px(16), Px(44));
 
-            // grelha de recentes: colunas pela largura, linhas pela altura disponível
-            int availW = W - 2 * pad, availH = yClip - Px(12) - y;
-            int cols = Math.Max(2, (availW + gap) / (Px(120) + gap));
-            int tw = (availW - gap * (cols - 1)) / cols;
-            int th = (int)(tw * 0.58f) + Px(24);
-            int rows = Math.Max(1, (availH + gap) / (th + gap));
-            int count = Math.Min(MaxTiles, cols * rows);
-
-            while (tiles.Count < count)
-            {
-                var t = new ThumbTile();
-                t.Click += delegate { if (t.Path != null) { HideNow(); TrayApp.Instance.OpenEditor(t.Path, null); } };
-                tiles.Add(t);
-                Controls.Add(t);
-            }
-            for (int i = 0; i < tiles.Count; i++)
-            {
-                var t = tiles[i];
-                if (i < count)
-                {
-                    t.Bounds = new Rectangle(pad + (i % cols) * (tw + gap), y + (i / cols) * (th + gap), tw, th);
-                    t.Visible = true;
-                }
-                else t.Visible = false;
-            }
-            bool changed = count != visibleTiles || tileSize != new Size(tw, th);
-            visibleTiles = count;
-            tileSize = new Size(tw, th);
+            // margem de 7 px livre dos dois lados: as bordas continuam a servir para redimensionar
+            grid.Bounds = new Rectangle(Px(7), y, W - 2 * Px(7), Math.Max(Px(60), yClip - Px(10) - y));
             Invalidate();
-            if (changed && Visible && !resizing) LoadRecents();
         }
 
         bool resizing;
@@ -249,7 +179,6 @@ namespace SnapStudio
         {
             base.OnResizeEnd(e);
             resizing = false;
-            LoadRecents();
             var st = TrayApp.Instance != null ? TrayApp.Instance.Settings : null;
             if (st != null && !TrayApp.Instance.Headless)
             {
@@ -335,7 +264,8 @@ namespace SnapStudio
             btnRecord.IconName = rec ? "stop" : "record";
             btnRecord.Badge = st.HotkeyRecord != 0 ? Settings.HotkeyText(st.HotkeyRecord) : null;
             try { clipVisible = Clipboard.ContainsImage(); } catch { clipVisible = false; }
-            LoadRecents();
+            grid.ClearSelection();   // cada abertura do painel começa sem seleção
+            Reload();
         }
 
         public void ShowPanel()
@@ -379,79 +309,207 @@ namespace SnapStudio
         protected override void OnDeactivate(EventArgs e)
         {
             base.OnDeactivate(e);
-            if (resizing) return;
+            if (resizing || dialogOpen) return;
             HideNow();
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             if (keyData == Keys.Escape) { HideNow(); return true; }
+            if (grid.Focused)
+            {
+                switch (keyData)
+                {
+                    case Keys.Enter: OpenSelected(); return true;
+                    case Keys.Delete: DeletePaths(SelectedPaths()); return true;
+                    case Keys.F2: RenameSelected(); return true;
+                    case Keys.Control | Keys.C: CopyPaths(SelectedPaths()); return true;
+                    case Keys.Control | Keys.A: grid.SelectAll(); return true;
+                }
+            }
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
-        void LoadRecents()
+        // ================= capturas =================
+
+        string Folder { get { return TrayApp.Instance.Settings.OutputFolder; } }
+
+        /// <summary>Lê todas as capturas da pasta (mais recentes primeiro), mantendo a seleção.</summary>
+        public void Reload()
         {
+            var sel = new HashSet<string>(grid.Selected.Select(i => i.Path), StringComparer.OrdinalIgnoreCase);
             List<FileInfo> files;
             try
             {
-                string folder = TrayApp.Instance.Settings.OutputFolder;
-                string[] exts = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".mp4" };
-                files = Directory.Exists(folder)
-                    ? new DirectoryInfo(folder).EnumerateFiles().Where(f => exts.Contains(f.Extension.ToLowerInvariant())).OrderByDescending(f => f.LastWriteTime).Take(visibleTiles).ToList()
+                files = Directory.Exists(Folder)
+                    ? new DirectoryInfo(Folder).EnumerateFiles().Where(f => Exts.Contains(f.Extension.ToLowerInvariant())).OrderByDescending(f => f.LastWriteTime).ToList()
                     : new List<FileInfo>();
             }
             catch { files = new List<FileInfo>(); }
 
-            Size sz = new Size(Math.Max(1, tileSize.Width), Math.Max(1, tileSize.Height - Px(24)));
-            var todo = new List<KeyValuePair<ThumbTile, string>>();
-            for (int i = 0; i < tiles.Count; i++)
+            var items = files.Select(f => new CaptureItem
             {
-                var t = tiles[i];
-                if (i < files.Count && i < visibleTiles)
-                {
-                    var f = files[i];
-                    t.Path = f.FullName;
-                    t.Caption = Ago(f.LastWriteTime);
-                    t.AccessibleName = f.Name;
-                    tips.SetToolTip(t, f.Name);
-                    string key = f.FullName + "|" + f.LastWriteTimeUtc.Ticks + "|" + sz.Width;
-                    Bitmap b;
-                    if (thumbCache.TryGetValue(key, out b)) t.Image = b;
-                    else
-                    {
-                        // enquanto carrega, reaproveitar uma miniatura de outro tamanho, se existir
-                        string prefix = f.FullName + "|" + f.LastWriteTimeUtc.Ticks + "|";
-                        t.Image = thumbCache.Where(kv => kv.Key.StartsWith(prefix)).Select(kv => kv.Value).FirstOrDefault();
-                        todo.Add(new KeyValuePair<ThumbTile, string>(t, key));
-                    }
-                }
-                else { t.Path = null; t.Image = null; t.Caption = ""; }
-                t.Invalidate();
-            }
+                Path = f.FullName,
+                Name = f.Name,
+                Time = f.LastWriteTime,
+                Size = f.Length,
+                Key = f.FullName + "|" + f.LastWriteTimeUtc.Ticks + "|" + f.Length,
+            }).ToList();
+            foreach (var it in items) it.Selected = sel.Contains(it.Path);
 
+            // libertar as miniaturas de ficheiros que já não existem ou mudaram
+            var keep = new HashSet<string>(items.Select(i => i.Key));
+            foreach (var k in thumbCache.Keys.Where(k => !keep.Contains(k)).ToList()) { thumbCache[k].Dispose(); thumbCache.Remove(k); }
+
+            grid.SetItems(items);
+            UpdateSelectionUi();
+            LoadThumbnails(items);
+        }
+
+        void LoadThumbnails(List<CaptureItem> items)
+        {
             int ver = ++loadVersion;
+            var todo = items.Where(i => !thumbCache.ContainsKey(i.Key)).ToList();
             if (todo.Count == 0) return;
+            if (!IsHandleCreated) CreateHandle();
+            Size sz = grid.ThumbSize;
             ThreadPool.QueueUserWorkItem(delegate
             {
-                foreach (var kv in todo)
+                // por ordem (mais recentes primeiro): as que se veem chegam logo
+                foreach (var it in todo)
                 {
-                    if (ver != loadVersion) return;
-                    string path = kv.Value.Substring(0, kv.Value.IndexOf('|'));
-                    Bitmap b = null;
+                    if (ver != loadVersion || IsDisposed) return;
+                    Bitmap th = null;
                     Size dim;
-                    try { b = ImageUtil.ThumbCover(path, sz, out dim); } catch { }
-                    if (b == null) continue;
+                    try { th = ImageUtil.ThumbCover(it.Path, sz, out dim); } catch { }
+                    if (th == null) continue;
+                    var item = it;
+                    var bmp = th;
                     try
                     {
                         BeginInvoke((Action)delegate
                         {
-                            thumbCache[kv.Value] = b;
-                            if (kv.Key.Path == path) { kv.Key.Image = b; kv.Key.Invalidate(); }
+                            if (IsDisposed || thumbCache.ContainsKey(item.Key)) { bmp.Dispose(); return; }
+                            thumbCache[item.Key] = bmp;
+                            grid.Invalidate();
                         });
                     }
-                    catch { return; }
+                    catch { bmp.Dispose(); return; }
                 }
             });
+        }
+
+        void UpdateSelectionUi()
+        {
+            int n = grid.Selected.Count;
+            btnDelete.Visible = n > 0;
+            if (n > 0)
+            {
+                btnDelete.Text = S.T("Apagar", "Delete") + (n > 1 ? " (" + n + ")" : "");
+                btnDelete.Size = new Size(btnDelete.PreferredWidth, Px(28));
+                btnDelete.Location = new Point(ClientSize.Width - Px(14) - btnDelete.Width, yRecent - Px(2));
+            }
+            Invalidate(new Rectangle(0, yRecent - Px(4), ClientSize.Width, Px(32)));
+        }
+
+        List<string> SelectedPaths() { return grid.Selected.Select(i => i.Path).ToList(); }
+
+        void OpenSelected()
+        {
+            var paths = SelectedPaths();
+            if (paths.Count == 0) return;
+            HideNow();
+            foreach (var p in paths.Take(8)) TrayApp.Instance.OpenEditor(p, null);
+        }
+
+        void CopyPaths(List<string> paths)
+        {
+            if (paths.Count == 0) return;
+            try
+            {
+                var data = new DataObject();
+                var sc = new StringCollection();
+                sc.AddRange(paths.ToArray());
+                data.SetFileDropList(sc);
+                if (paths.Count == 1 && !VideoFile.Is(paths[0])) data.SetImage(ImageUtil.LoadNoLock(paths[0]));
+                Clipboard.SetDataObject(data, true, 5, 100);
+            }
+            catch (Exception ex) { Ask(ex.Message, MessageBoxButtons.OK); }
+        }
+
+        void DeletePaths(List<string> paths)
+        {
+            if (paths.Count == 0) return;
+            string msg = paths.Count == 1
+                ? S.T("Enviar \"", "Send \"") + Path.GetFileName(paths[0]) + S.T("\" para a Reciclagem?", "\" to the Recycle Bin?")
+                : S.T("Enviar ", "Send ") + paths.Count + S.T(" capturas para a Reciclagem?", " captures to the Recycle Bin?");
+            if (Ask(msg, MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+            foreach (var p in paths)
+            {
+                try
+                {
+                    FileSystem.DeleteFile(p, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                    Sidecar.Delete(p);
+                }
+                catch (Exception ex) { Ask(ex.Message, MessageBoxButtons.OK); }
+            }
+            grid.ClearSelection();
+            Reload();
+        }
+
+        void RenameSelected()
+        {
+            var paths = SelectedPaths();
+            if (paths.Count != 1) return;
+            string oldPath = paths[0];
+            string name;
+            dialogOpen = true;
+            try { name = Prompt.Show(this, S.T("Mudar o nome", "Rename"), S.T("Novo nome:", "New name:"), Path.GetFileNameWithoutExtension(oldPath)); }
+            finally { dialogOpen = false; }
+            if (string.IsNullOrWhiteSpace(name)) return;
+            name = name.Trim();
+            if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) { Ask(S.T("O nome contém caracteres inválidos.", "The name contains invalid characters."), MessageBoxButtons.OK); return; }
+            string newPath = Path.Combine(Path.GetDirectoryName(oldPath), name + Path.GetExtension(oldPath));
+            if (string.Equals(newPath, oldPath, StringComparison.OrdinalIgnoreCase)) return;
+            if (File.Exists(newPath)) { Ask(S.T("Já existe um ficheiro com esse nome.", "A file with that name already exists."), MessageBoxButtons.OK); return; }
+            try { File.Move(oldPath, newPath); Sidecar.Move(oldPath, newPath); Reload(); }
+            catch (Exception ex) { Ask(ex.Message, MessageBoxButtons.OK); }
+        }
+
+        void ShowInFolder()
+        {
+            var paths = SelectedPaths();
+            HideNow();
+            try
+            {
+                if (paths.Count > 0) System.Diagnostics.Process.Start("explorer.exe", "/select,\"" + paths[0] + "\"");
+                else TrayApp.Instance.OpenFolder();
+            }
+            catch { }
+        }
+
+        void ShowMenu(Point p)
+        {
+            int n = grid.Selected.Count;
+            var m = new ContextMenuStrip { Renderer = new ThemedRenderer(), Font = Theme.Font(13 * dpi) };
+            var open = m.Items.Add(S.T("Abrir no editor", "Open in editor"), null, delegate { OpenSelected(); });
+            open.Font = Theme.Font(13 * dpi, FontStyle.Bold);
+            m.Items.Add(S.T("Copiar", "Copy"), null, delegate { CopyPaths(SelectedPaths()); });
+            m.Items.Add(S.T("Mostrar na pasta", "Show in folder"), null, delegate { ShowInFolder(); });
+            m.Items.Add(new ToolStripSeparator());
+            var rename = m.Items.Add(S.T("Mudar o nome (F2)", "Rename (F2)"), null, delegate { RenameSelected(); });
+            rename.Enabled = n == 1;
+            m.Items.Add(n > 1 ? S.T("Apagar ", "Delete ") + n + S.T(" capturas", " captures") : S.T("Apagar", "Delete"), null, delegate { DeletePaths(SelectedPaths()); });
+            m.Closed += delegate { BeginInvoke((Action)m.Dispose); };
+            m.Show(grid, p);
+        }
+
+        /// <summary>Caixa de mensagem por cima do painel, sem que o painel se feche ao perder o foco.</summary>
+        DialogResult Ask(string text, MessageBoxButtons buttons)
+        {
+            dialogOpen = true;
+            try { return MessageBox.Show(this, text, "SnapStudio", buttons, buttons == MessageBoxButtons.YesNo ? MessageBoxIcon.Question : MessageBoxIcon.None); }
+            finally { dialogOpen = false; }
         }
 
         static string Ago(DateTime t)
@@ -479,7 +537,15 @@ namespace SnapStudio
                 g.DrawLine(p, 0, yLine1, W, yLine1);
                 g.DrawLine(p, 0, yLine2, W, yLine2);
             }
-            TextRenderer.DrawText(g, S.T("Recentes", "Recent"), Theme.Font(13 * dpi, FontStyle.Bold), new Rectangle(Px(16), yRecent, Px(200), Px(24)), Theme.Text, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            var titleFont = Theme.Font(13 * dpi, FontStyle.Bold);
+            string title = S.T("Capturas", "Captures");
+            TextRenderer.DrawText(g, title, titleFont, new Rectangle(Px(16), yRecent, Px(200), Px(24)), Theme.Text, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            int tx = Px(16) + TextRenderer.MeasureText(g, title, titleFont, Size.Empty, TextFormatFlags.NoPadding).Width + Px(8);
+            if (grid.Items.Count > 0)
+                TextRenderer.DrawText(g, grid.Items.Count.ToString(), Theme.Font(12 * dpi), new Rectangle(tx, yRecent, Px(60), Px(24)), Theme.Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            if (!btnDelete.Visible && grid.Items.Count > 0)
+                TextRenderer.DrawText(g, S.T("Duplo clique para editar", "Double-click to edit"), Theme.Font(12 * dpi), new Rectangle(Px(120), yRecent, W - Px(16) - Px(120), Px(24)), Theme.Muted,
+                    TextFormatFlags.VerticalCenter | TextFormatFlags.Right | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
 
             var clip = new RectangleF(Px(14), yClip, W - Px(28), Px(44));
             clipRect = clip;

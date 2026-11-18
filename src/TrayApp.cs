@@ -67,7 +67,6 @@ namespace SnapStudio
         public readonly bool Headless;
         readonly List<EditorForm> editors = new List<EditorForm>();
         TrayPanel panel;
-        HistoryForm history;
         SettingsForm settingsForm;
         ToolStripMenuItem miRegion, miFull, miStartup, miRecord, miUpdate;
         Timer updateTimer;
@@ -111,7 +110,7 @@ namespace SnapStudio
 
             msg = new MessageWindow();
             msg.HotkeyPressed += OnHotkey;
-            msg.ShowRequested += ShowHistory;
+            msg.ShowRequested += ShowPanel;
             RegisterHotkeys(true);
 
             // versões novas no GitHub: pouco depois de arrancar e depois de hora a hora (só verifica de facto 1×/dia)
@@ -170,7 +169,7 @@ namespace SnapStudio
             miRecord = new ToolStripMenuItem(S.T("Gravar vídeo do ecrã", "Record screen video"), ToolIcons.Get("record", s, ink), delegate { ToggleRecording(); });
             m.Items.Add(miRecord);
             m.Items.Add(new ToolStripSeparator());
-            m.Items.Add(new ToolStripMenuItem(S.T("Histórico de capturas", "Capture history"), ToolIcons.Get("history", s, ink), delegate { ShowHistory(); }));
+            m.Items.Add(new ToolStripMenuItem(S.T("Ver capturas", "View captures"), ToolIcons.Get("history", s, ink), delegate { ShowPanel(); }));
             m.Items.Add(new ToolStripMenuItem(S.T("Abrir imagem…", "Open image…"), ToolIcons.Get("open", s, ink), delegate { OpenImageDialog(); }));
             m.Items.Add(new ToolStripMenuItem(S.T("Abrir pasta das capturas", "Open captures folder"), ToolIcons.Get("folder", s, ink), delegate { OpenFolder(); }));
             m.Items.Add(new ToolStripSeparator());
@@ -460,13 +459,11 @@ namespace SnapStudio
             try { System.Diagnostics.Process.Start("explorer.exe", "\"" + Settings.OutputFolder + "\""); } catch { }
         }
 
-        public void ShowHistory()
+        /// <summary>Mostra o painel junto ao relógio, com todas as capturas (substitui a antiga janela do histórico).</summary>
+        public void ShowPanel()
         {
-            if (history == null || history.IsDisposed) history = new HistoryForm();
-            history.Show();
-            if (history.WindowState == FormWindowState.Minimized) history.WindowState = FormWindowState.Normal;
-            history.Activate();
-            Native.SetForegroundWindow(history.Handle);
+            if (panel == null || panel.IsDisposed || panel.Visible) return;
+            panel.ShowPanel();
         }
 
         public void ShowSettings() { ShowSettings(null); }
@@ -475,7 +472,6 @@ namespace SnapStudio
         public void ShowSettings(string page)
         {
             if (settingsForm != null && !settingsForm.IsDisposed) { if (page != null) settingsForm.ShowPage(page); settingsForm.Activate(); return; }
-            string oldFolder = Settings.OutputFolder;
             msg.UnregisterAll(); // para poder carregar nas teclas dentro da caixa de atalhos
             using (settingsForm = new SettingsForm(Settings, page))
             {
@@ -483,8 +479,6 @@ namespace SnapStudio
                 {
                     try { Settings.Save(); } catch (Exception ex) { MessageBox.Show(ex.Message, "SnapStudio"); }
                     Theme.Configure(Settings.ThemeMode, Settings.Accent);
-                    if (!string.Equals(oldFolder, Settings.OutputFolder, StringComparison.OrdinalIgnoreCase) && history != null && !history.IsDisposed)
-                        history.FolderChanged();
                 }
             }
             settingsForm = null;
@@ -507,7 +501,6 @@ namespace SnapStudio
                 e.Close();
                 if (!e.IsDisposed && e.Visible) return; // utilizador cancelou
             }
-            if (history != null && !history.IsDisposed) history.Close();
             SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
             panel.Dispose();
             tray.Visible = false;

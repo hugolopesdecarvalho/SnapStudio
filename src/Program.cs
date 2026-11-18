@@ -17,7 +17,6 @@ namespace SnapStudio
                 new TrayApp(folder, theme);
                 Form f;
                 if (name == "panel") { var p = new TrayPanel(); p.Prepare(); f = p; }
-                else if (name == "history") f = new HistoryForm();
                 else if (name == "settings") f = new SettingsForm(TrayApp.Instance.Settings);
                 else f = new EditorForm(image, null, name == "quick");
                 f.StartPosition = FormStartPosition.Manual;
