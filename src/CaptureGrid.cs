@@ -19,7 +19,7 @@ namespace SnapStudio
     /// <summary>
     /// Grelha das capturas no painel: miniaturas com scroll vertical.
     /// Clique seleciona (Ctrl junta, Shift seleciona um intervalo), arrastar desenha um retângulo
-    /// de seleção, duplo clique abre. Arrastar uma imagem já selecionada leva-a para outra app.
+    /// de seleção a partir de espaço vazio, duplo clique abre. Arrastar uma imagem leva-a para outra app.
     /// </summary>
     class CaptureGrid : ScrollableControl
     {
@@ -29,7 +29,6 @@ namespace SnapStudio
         public List<CaptureItem> Items = new List<CaptureItem>();
         CaptureItem hoverItem, anchor, downItem;
         Point downPt;
-        bool dragOut;
         // seleção com o rato (retângulo), em coordenadas do conteúdo
         bool marquee;
         Point marqueeStart, marqueeEnd;
@@ -192,19 +191,10 @@ namespace SnapStudio
             if (downItem != null && e.Button == MouseButtons.Left &&
                 (Math.Abs(e.X - downPt.X) > SystemInformation.DragSize.Width || Math.Abs(e.Y - downPt.Y) > SystemInformation.DragSize.Height))
             {
+                // arrastar uma imagem (e as restantes selecionadas): largar no Outlook, Teams, Explorador…
                 downItem = null;
-                if (dragOut)
-                {
-                    // arrastar imagens já selecionadas: largar no Outlook, Teams, Explorador…
-                    var paths = Selected.Select(x => x.Path).ToArray();
-                    if (paths.Length > 0) DoDragDrop(new DataObject(DataFormats.FileDrop, paths), DragDropEffects.Copy);
-                }
-                else
-                {
-                    // arrastar a partir de uma imagem não selecionada: retângulo de seleção
-                    BeginMarquee(ToContent(downPt), false);
-                    UpdateMarquee(e.Location);
-                }
+                var paths = Selected.Select(x => x.Path).ToArray();
+                if (paths.Length > 0) DoDragDrop(new DataObject(DataFormats.FileDrop, paths), DragDropEffects.Copy);
             }
         }
 
@@ -233,7 +223,6 @@ namespace SnapStudio
                 }
                 else
                 {
-                    dragOut = it.Selected;
                     if (!it.Selected) foreach (var i in Items) i.Selected = i == it;
                     anchor = it;
                     downItem = it; downPt = e.Location;
