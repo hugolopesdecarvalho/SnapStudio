@@ -80,7 +80,7 @@ enum Capture {
 
     /// Janelas temporárias da própria SnapStudio que nunca devem aparecer numa captura ou vídeo:
     /// painel, ecrã de seleção, moldura/barra/contagem da gravação (todas acima do nível normal).
-    /// As janelas normais da app (editor, histórico, definições) aparecem, como as de qualquer outra app.
+    /// As janelas normais da app (editor, definições) aparecem, como as de qualquer outra app.
     static func ownTransientWindows(_ content: SCShareableContent) -> [SCWindow] {
         content.windows.filter { $0.owningApplication?.processID == getpid() && $0.windowLayer != 0 }
     }

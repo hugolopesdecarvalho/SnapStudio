@@ -10,12 +10,11 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
     private var statusItem: NSStatusItem!
     private var panel: TrayPanelController!
     private var windows: [NSWindowController] = []
-    private var historyWC: HostWindowController?
     private var settingsWC: HostWindowController?
     private(set) var recording: ScreenRecording?
     private var capturing = false
     private(set) var lastExternalApp: NSRunningApplication?
-    /// pid da app à frente no momento do pedido de captura, quando é a própria SnapStudio (editor, histórico…).
+    /// pid da app à frente no momento do pedido de captura, quando é a própria SnapStudio (editor, definições…).
     private var activeAppPidAtRequest: pid_t?
     private(set) var lastCopied = false
 
@@ -103,9 +102,9 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
         }
     }
 
-    /// Abrir a app outra vez (Finder, Spotlight) mostra o histórico.
+    /// Abrir a app outra vez (Finder, Spotlight) mostra o painel da barra de menus.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { showHistory() }
+        if !flag { showPanel() }
         return true
     }
 
@@ -166,6 +165,8 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
 
     func togglePanel() { panel.toggle(below: statusItem.button) }
 
+    func showPanel() { panel.show(below: statusItem.button) }
+
     func closePanel() { panel?.hide() }
 
     /// Pergunta antes de sair: sem a app, os atalhos de captura deixam de funcionar.
@@ -211,7 +212,6 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
         m.addItem(item(isRecording ? S.t("Parar a gravação", "Stop recording") : S.t("Gravar vídeo do ecrã", "Record screen video"),
                        isRecording ? "stop.circle" : "record.circle", settings.hotkeyRecord) { [weak self] in self?.toggleRecording() })
         m.addItem(.separator())
-        m.addItem(item(S.t("Histórico de capturas", "Capture history"), "clock.arrow.circlepath") { [weak self] in self?.showHistory() })
         m.addItem(item(S.t("Abrir imagem…", "Open image…"), "photo") { [weak self] in self?.openImageDialog() })
         m.addItem(item(S.t("Abrir pasta das capturas", "Open captures folder"), "folder") { [weak self] in self?.openFolder() })
         m.addItem(.separator())
@@ -276,7 +276,6 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
         closure(file, S.t("Gravar vídeo do ecrã", "Record screen video")) { [weak self] in self?.toggleRecording() }
         file.addItem(.separator())
         closure(file, S.t("Abrir imagem…", "Open image…"), "o") { [weak self] in self?.openImageDialog() }
-        closure(file, S.t("Histórico de capturas", "Capture history"), "y") { [weak self] in self?.showHistory() }
         file.addItem(.separator())
         add(file, S.t("Fechar", "Close"), #selector(NSWindow.performClose(_:)), "w")
         add(file, S.t("Guardar", "Save"), #selector(CanvasView.saveDocument(_:)), "s")
@@ -375,7 +374,7 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
                 img = Capture.compose(shots)
                 scale = shots.map { $0.scale }.max() ?? scale
             case .activeWindow:
-                // se a SnapStudio estava à frente (editor, histórico…), é a janela dela que se captura
+                // se a SnapStudio estava à frente (editor, definições…), é a janela dela que se captura
                 img = try await Capture.captureActiveWindow(pid: activeAppPidAtRequest ?? lastExternalApp?.processIdentifier)
                 if let i = img { img = windowCorners(i) }
             case .region:
@@ -534,7 +533,6 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
 
     func windowClosed(_ wc: NSWindowController) {
         windows.removeAll { $0 === wc }
-        if historyWC === wc { historyWC = nil }
         if settingsWC === wc { settingsWC = nil; registerHotkeys(notify: true) }
         updateActivationPolicy()
     }
@@ -564,15 +562,6 @@ final class AppController: NSObject, NSApplicationDelegate, UNUserNotificationCe
     func openFolder() {
         try? FileManager.default.createDirectory(at: settings.outputURL, withIntermediateDirectories: true)
         NSWorkspace.shared.open(settings.outputURL)
-    }
-
-    func showHistory() {
-        closePanel()
-        if let h = historyWC { h.show(); return }
-        let wc = HostWindowController(title: S.t("Histórico de capturas", "Capture history"), size: CGSize(width: 980, height: 680),
-                                      root: AnyView(HistoryView()), resizable: true, autosave: "SnapStudioHistory")
-        historyWC = wc
-        wc.show()
     }
 
     func showSettings(tab: String? = nil) {
@@ -673,7 +662,7 @@ final class ClosureMenuItem: NSMenuItem {
     }
 }
 
-/// Janela simples com conteúdo SwiftUI (histórico, definições).
+/// Janela simples com conteúdo SwiftUI (definições).
 final class HostWindowController: NSWindowController, NSWindowDelegate {
     init(title: String, size: CGSize, root: AnyView, resizable: Bool, autosave: String?) {
         var style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable]

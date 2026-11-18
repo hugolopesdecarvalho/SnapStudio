@@ -540,7 +540,7 @@ namespace SnapStudio
                 g.DrawLine(p, 0, yLine2, W, yLine2);
             }
             var titleFont = Theme.Font(13 * dpi, FontStyle.Bold);
-            string title = S.T("Capturas", "Captures");
+            string title = S.T("Recentes", "Recent");
             TextRenderer.DrawText(g, title, titleFont, new Rectangle(Px(16), yRecent, Px(200), Px(24)), Theme.Text, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             int tx = Px(16) + TextRenderer.MeasureText(g, title, titleFont, Size.Empty, TextFormatFlags.NoPadding).Width + Px(8);
             if (grid.Items.Count > 0)

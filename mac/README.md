@@ -11,7 +11,7 @@ The interface is in Portuguese when macOS is set to Portuguese, and in English o
 
 ## Menu bar
 SnapStudio appears in the menu bar (viewfinder icon).
-**Click** the icon to open the panel: capture, record video, see recent captures, switch theme and open the history. **Right-click** (or Control-click) for the full menu.
+**Click** the icon to open the panel: capture, record video, browse and manage your captures, switch theme. **Right-click** (or Control-click) for the full menu. Opening the app again from Finder or Spotlight also shows the panel.
 
 ### Screen recording permission
 On the first capture, macOS asks for permission. Turn on SnapStudio in
@@ -33,7 +33,7 @@ Macs have no PrtScn key. The default shortcuts avoid the system ones (⌘⇧3/4/
 A clicked window (or the active window) is captured on its own, without its shadow. macOS windows have rounded corners, so *Settings › After capture › Window corners* sets what fills them: white (default), black, transparent (PNG) or the screen behind the window.
 
 After a capture, the image is saved to `Pictures/SnapStudio`, **copied to the clipboard** (⌘V in any app) and, depending on Settings, opened in:
-- **Quick editor** (pop-up below the menu bar): select, arrow, box, text, blur, steps, crop; *Close & Copy* (⌘↩). Esc or clicking outside saves and closes. Only used right after a capture: captures opened from the panel, history or a notification open in the full editor.
+- **Quick editor** (pop-up below the menu bar): select, arrow, box, text, blur, steps, crop; *Close & Copy* (⌘↩). Esc or clicking outside saves and closes. Only used right after a capture: captures opened from the panel or a notification open in the full editor.
 - **Full editor**: all tools, properties (color, width, text size) and the annotation list.
 - **Nothing**: just save and copy, with a notification. Clicking the notification opens the editor.
 
@@ -47,8 +47,13 @@ Select (V), Arrow (A), Box (R), Text (T), **Blur** (B) and Pixelate (X) to hide 
 After placing an annotation the editor returns to Select (V) with it selected; numbered steps and freehand stay active. The full editor's properties panel shows only what applies to the selected annotation or active tool: color, width, text size, text *Outline* (auto/white/black/none), *Fill* with opacity (boxes, ellipses), *Rounded corners* with a radius (boxes, highlighter, blur, pixelate) and *Rounded tip* (arrows).
 Annotations stay editable when you reopen a capture (helper files in `~/Library/Application Support/SnapStudio/edit`).
 
-## History
-Thumbnail cards (images and videos) grouped by date, search (⌘F), filters (Today, This week, Annotated, Videos), hover actions (copy, edit, show in Finder, Trash), drag to other apps, context menu with *Rename…*. ⌫ moves the selected capture to the Trash.
+## Recent captures
+The panel's *Recent* grid shows every capture in the folder (images and MP4 videos), newest first, and scrolls vertically; thumbnails load as you scroll, so large folders stay fast. It updates by itself when files are added, renamed or deleted (also from Finder). There is no separate history window any more.
+- **Click** selects a capture, **⌘-click** adds or removes one, **⇧-click** selects a range, **⌘A** selects all. **Drag from empty space** to draw a selection rectangle (the grid scrolls when you drag past the top or bottom edge). Clicking empty space or **Esc** clears the selection.
+- **Double-click** opens a capture in the full editor (videos open in the system player).
+- **Delete**: with captures selected, a trash button and “N selected” appear in the *Recent* header; it, or **⌫**, moves them to the Trash after asking for confirmation (editable annotations are removed too).
+- **Right-click** a capture for *Open in editor*, *Copy*, *Show in Finder*, *Rename…* and *Move to Trash* (applied to the whole selection when the capture is part of it).
+- Drag a capture from the grid into another app.
 
 ## Settings
 A sidebar with General (open at login, permission status), Appearance (light/dark/same as macOS theme, accent color), After capture (what opens, clipboard, notifications), Shortcuts, Files (folder and PNG/JPG format), Video (15/30/60 fps, cursor) and About (version and updates). Changes apply immediately.

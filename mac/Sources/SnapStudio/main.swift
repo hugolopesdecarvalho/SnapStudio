@@ -24,9 +24,9 @@ if args.count >= 3 && args[1] == "--readme-shots" {
 if args.count >= 3 && args[1] == "--window-test" {
     exit(DemoShots.windowTest(outDir: URL(fileURLWithPath: args[2])) ? 0 : 1)
 }
-// Teste: seleção múltipla do histórico
-if args.count >= 3 && args[1] == "--history-test" {
-    exit(DemoShots.historyTest(outDir: URL(fileURLWithPath: args[2])) ? 0 : 1)
+// Teste: seleção múltipla nos recentes do painel
+if args.count >= 3 && args[1] == "--recents-test" {
+    exit(DemoShots.recentsTest(outDir: URL(fileURLWithPath: args[2])) ? 0 : 1)
 }
 // Teste: imagem anterior/seguinte no editor
 if args.count >= 3 && args[1] == "--nav-test" {
@@ -42,7 +42,7 @@ if args.count >= 3 && args[1] == "--settings-shots" {
     DemoShots.settingsShots(outDir: URL(fileURLWithPath: args[2]), theme: args.count > 3 ? args[3] : "light")
     exit(0)
 }
-// Modo de teste: desenha as janelas fora do ecrã (painel, editor, histórico, definições) para PNG
+// Modo de teste: desenha as janelas fora do ecrã (painel, editor, definições) para PNG
 if args.count >= 3 && args[1] == "--ui-snapshot" {
     SelfTest.uiSnapshots(outDir: URL(fileURLWithPath: args[2]), theme: args.count > 3 ? args[3] : "light")
     exit(0)

@@ -6,13 +6,35 @@ import SwiftUI
 // aviso da área de transferência, interruptor do editor e rodapé. Redimensionável; o tamanho fica guardado.
 
 final class TrayModel: ObservableObject {
+    /// Todas as capturas da pasta (imagens e vídeos), da mais recente para a mais antiga.
     @Published var recents: [CaptureItem] = []
     @Published var recording = false
     @Published var openEditor = true
     @Published var clipboardHasImage = false
     @Published var update: ReleaseInfo?
     private var tokens: [NSObjectProtocol] = []
-    static let maxTiles = 40
+    private var watcher: DispatchSourceFileSystemObject?
+    private var watchedPath = ""
+    private var watchPending = false
+
+    // seleção na grelha de recentes (ver RecentsGrid.swift)
+    /// Capturas selecionadas (clique, ⌘-clique para juntar/retirar, ⇧-clique para um intervalo, ⌘A para todas).
+    @Published var selection: Set<URL> = []
+    /// Retângulo de seleção a ser arrastado (coordenadas do conteúdo da grelha).
+    @Published var marquee: CGRect?
+    var anchor: URL?
+    var marqueeBase: Set<URL> = []
+    var marqueeStart: CGPoint?
+    /// Posição do rato no retângulo visível da grelha (para o deslocamento automático).
+    var marqueePointer: CGPoint = .zero
+    var layout = GridLayout()
+    var viewportHeight: CGFloat = 0
+    /// minY do conteúdo no retângulo visível (0 no topo, negativo depois de deslocar).
+    var scrollOffset: CGFloat = 0
+    var autoScrollDir = 0
+    var autoScrollTimer: Timer?
+    /// Desloca a grelha até uma linha (definido pela vista, com o ScrollViewProxy).
+    var scrollToRow: ((Int, UnitPoint) -> Void)?
 
     init() {
         refresh()
@@ -21,16 +43,50 @@ final class TrayModel: ObservableObject {
             tokens.append(nc.addObserver(forName: n, object: nil, queue: .main) { [weak self] _ in self?.refresh() })
         }
     }
-    deinit { tokens.forEach(NotificationCenter.default.removeObserver) }
+    deinit {
+        tokens.forEach(NotificationCenter.default.removeObserver)
+        autoScrollTimer?.invalidate()
+        watcher?.cancel()
+    }
 
     func refresh() {
         let app = AppController.shared
-        recents = Array(CaptureItem.scan(app.settings.outputURL).prefix(TrayModel.maxTiles))
+        watchFolder(app.settings.outputURL)
+        let items = CaptureItem.scan(app.settings.outputURL)
+        if items != recents { recents = items }
+        let urls = Set(items.map { $0.url })
+        if !selection.isSubset(of: urls) { selection.formIntersection(urls) }
+        if let a = anchor, !urls.contains(a) { anchor = nil }
         recording = app.isRecording
         openEditor = app.settings.afterCapture != "none"
         let types = NSPasteboard.general.types ?? []
         clipboardHasImage = types.contains(.png) || types.contains(.tiff) || types.contains(.fileURL)
         update = UpdateChecker.shared.pending
+    }
+
+    /// Vigia a pasta das capturas: ficheiros apagados, renomeados ou acrescentados fora da app (Finder…) atualizam a grelha.
+    private func watchFolder(_ url: URL) {
+        guard url.path != watchedPath else { return }
+        watcher?.cancel()
+        watcher = nil
+        watchedPath = ""
+        let fd = Darwin.open(url.path, O_EVTONLY)
+        guard fd >= 0 else { return }      // a pasta ainda não existe: tenta de novo no próximo refresh
+        watchedPath = url.path
+        let src = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .delete, .rename], queue: .main)
+        src.setEventHandler { [weak self] in self?.folderChanged() }
+        src.setCancelHandler { Darwin.close(fd) }
+        src.resume()
+        watcher = src
+    }
+
+    private func folderChanged() {
+        guard !watchPending else { return }
+        watchPending = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.watchPending = false
+            self?.refresh()
+        }
     }
 }
 
@@ -45,10 +101,13 @@ final class TrayWindow: NSPanel {
 final class TrayPanelController: NSObject, NSWindowDelegate {
     static let defaultSize = CGSize(width: 460, height: 620)
     static let minSize = CGSize(width: 360, height: 500)
+    /// > 0 enquanto um alerta aberto a partir do painel está no ecrã (o painel não fecha ao perder o foco).
+    private(set) static var alertDepth = 0
 
     let window: TrayWindow
     let model = TrayModel()
     private var lastHidden = Date.distantPast
+    private var keyMonitor: Any?
 
     override init() {
         let st = AppController.shared.settings
@@ -68,10 +127,49 @@ final class TrayPanelController: NSObject, NSWindowDelegate {
         window.minSize = Self.minSize
         window.animationBehavior = .utilityWindow
         window.delegate = self
-        window.onCancel = { [weak self] in self?.hide() }
+        // Esc: primeiro limpa a seleção da grelha, depois fecha o painel
+        window.onCancel = { [weak self] in
+            guard let self else { return }
+            if !self.model.selection.isEmpty { self.model.clearSelection() } else { self.hide() }
+        }
         let host = NSHostingView(rootView: TrayPanelView(model: model))
         host.autoresizingMask = [.width, .height]
         window.contentView = host
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
+            guard let self, e.window === self.window, self.window.isVisible else { return e }
+            return self.handleKey(e) ? nil : e
+        }
+    }
+
+    deinit { if let k = keyMonitor { NSEvent.removeMonitor(k) } }
+
+    /// ⌫ / ⌦ (ou ⌘⌫) apagam as capturas selecionadas; ⌘A seleciona todas.
+    private func handleKey(_ e: NSEvent) -> Bool {
+        let mods = e.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if (e.keyCode == 51 || e.keyCode == 117) && mods.isDisjoint(with: [.shift, .option, .control]) {
+            guard !model.selection.isEmpty else { return false }
+            let items = model.selectedItems
+            // fora do tratamento do evento: o alerta de confirmação corre num ciclo modal
+            DispatchQueue.main.async { [weak self] in self?.model.trash(items) }
+            return true
+        }
+        if mods.contains(.command) && mods.isDisjoint(with: [.shift, .option, .control]) && e.charactersIgnoringModifiers?.lowercased() == "a" {
+            model.selectAll()
+            return true
+        }
+        return false
+    }
+
+    /// Mostra um alerta modal por cima do painel sem o fechar (o painel está ao nível dos menus).
+    @discardableResult
+    static func runAlert(_ a: NSAlert) -> NSApplication.ModalResponse {
+        alertDepth += 1
+        NSApp.activate(ignoringOtherApps: true)
+        a.window.level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue + 1)
+        let r = a.runModal()
+        alertDepth -= 1
+        if let w = NSApp.windows.first(where: { $0 is TrayWindow && $0.isVisible }) { w.makeKey() }
+        return r
     }
 
     var isVisible: Bool { window.isVisible }
@@ -104,10 +202,12 @@ final class TrayPanelController: NSObject, NSWindowDelegate {
         guard window.isVisible else { return }
         window.orderOut(nil)
         lastHidden = Date()
+        model.marqueeEnded()
+        model.clearSelection()
     }
 
     func windowDidResignKey(_ notification: Notification) {
-        if window.inLiveResize { return }
+        if window.inLiveResize || Self.alertDepth > 0 { return }
         hide()
     }
 
@@ -182,18 +282,22 @@ struct TrayPanelView: View {
 
             Rectangle().fill(Pal.border).frame(height: 1)
 
-            HStack {
+            HStack(spacing: 6) {
                 Text(S.t("Recentes", "Recent")).font(.system(size: 13, weight: .bold)).foregroundStyle(Pal.text)
                 Spacer()
-                Button { app.showHistory() } label: {
-                    Text(S.t("Ver histórico", "View history")).font(.system(size: 13)).padding(.horizontal, 12).frame(height: 28)
+                if !model.selection.isEmpty {
+                    Text(selectedLabel(model.selection.count)).font(.system(size: 12.5)).foregroundStyle(Pal.muted)
+                    Button { model.trash(model.selectedItems) } label: {
+                        Image(systemName: "trash").font(.system(size: 14)).frame(width: 32, height: 28)
+                    }
+                    .buttonStyle(FlatButtonStyle(kind: .ghost))
+                    .help(S.t("Mover as capturas selecionadas para o Lixo (⌫)", "Move the selected captures to the Trash (⌫)"))
                 }
-                .buttonStyle(FlatButtonStyle(kind: .ghost))
             }
             .padding(.leading, 16).padding(.trailing, pad)
             .padding(.top, 8).frame(height: 40, alignment: .center)
 
-            RecentsGrid(items: model.recents, pad: pad)
+            RecentsGrid(model: model, pad: pad)
                 .padding(.bottom, 12)
 
             clipBox
@@ -223,6 +327,10 @@ struct TrayPanelView: View {
     }
 
     // ---------- partes ----------
+
+    private func selectedLabel(_ n: Int) -> String {
+        n == 1 ? S.t("1 selecionada", "1 selected") : S.t("\(n) selecionadas", "\(n) selected")
+    }
 
     private var header: some View {
         HStack(spacing: 8) {
@@ -360,76 +468,6 @@ struct TrayPanelView: View {
             Text(title).font(.system(size: 13)).padding(.horizontal, 12).frame(height: 36)
         }
         .buttonStyle(FlatButtonStyle(kind: .ghost))
-    }
-}
-
-/// Grelha de recentes: colunas pela largura (mín. 120 pt), linhas pela altura disponível; lugares vazios tracejados.
-struct RecentsGrid: View {
-    let items: [CaptureItem]
-    let pad: CGFloat
-    private let gap: CGFloat = 8
-
-    var body: some View {
-        GeometryReader { geo in
-            let availW = geo.size.width - 2 * pad, availH = geo.size.height
-            let cols = max(2, Int((availW + gap) / (120 + gap)))
-            let tw = (availW - gap * CGFloat(cols - 1)) / CGFloat(cols)
-            let th0 = (tw * 0.58).rounded() + 24
-            let rows = max(1, Int((availH + gap) / (th0 + gap)))
-            let th = max(48, min(th0, availH))      // painel baixo: os cartões encolhem em vez de tapar o resto
-            let count = min(TrayModel.maxTiles, cols * rows)
-            VStack(alignment: .leading, spacing: gap) {
-                ForEach(0..<rows, id: \.self) { r in
-                    HStack(spacing: gap) {
-                        ForEach(0..<cols, id: \.self) { c in
-                            let i = r * cols + c
-                            if i < count && i < items.count {
-                                ThumbTile(item: items[i]).frame(width: tw, height: th)
-                            } else {
-                                RoundedRectangle(cornerRadius: 8)
-                                    .strokeBorder(Pal.border, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                                    .frame(width: tw, height: th)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, pad)
-        }
-        .frame(minHeight: 60)
-    }
-}
-
-struct ThumbTile: View {
-    let item: CaptureItem
-    @StateObject private var hover = Box(false)
-
-    var body: some View {
-        Button {
-            AppController.shared.openEditor(item.url, image: nil, compact: false)
-        } label: {
-            VStack(spacing: 0) {
-                // a miniatura não pode influenciar o tamanho do cartão (capturas muito altas ou largas)
-                Pal.surface2
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .overlay(alignment: .top) { ThumbView(url: item.url, size: 240) }
-                    .clipped()
-                Rectangle().fill(Pal.border).frame(height: 1)
-                Text(RelTime.short(item.date))
-                    .font(.system(size: 11.5)).foregroundStyle(Pal.muted).lineLimit(1)
-                    .padding(.horizontal, 7)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(height: 23)
-            }
-            .background(Pal.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(hover.value ? Theme.accentColor : Pal.border, lineWidth: hover.value ? 1.5 : 1))
-            .contentShape(RoundedRectangle(cornerRadius: 8))
-        }
-        .buttonStyle(.plain)
-        .onHover { hover.value = $0 }
-        .help(item.name)
-        .onDrag { NSItemProvider(contentsOf: item.url) ?? NSItemProvider() }
     }
 }
 

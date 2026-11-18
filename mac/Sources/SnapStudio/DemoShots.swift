@@ -75,21 +75,11 @@ enum DemoShots {
                 shoot(wc.window!, outDir.appendingPathComponent("quick-editor-\(theme).png"))
                 wc.window?.orderOut(nil)
             }
-
-            // histórico
-            let hist = HostWindowController(title: S.t("Histórico de capturas", "Capture history"), size: CGSize(width: 1000, height: 640),
-                                            root: AnyView(HistoryView()), resizable: true, autosave: nil)
-            hist.window?.center()
-            hist.window?.orderFrontRegardless()
-            pump(2.5)
-            shoot(hist.window!, outDir.appendingPathComponent("history-\(theme).png"))
-            hist.window?.orderOut(nil)
         }
         try? fm.removeItem(at: caps)
         print("OK -> \(outDir.path)")
     }
 
-    /// `--history-test <pasta>`: testa a seleção múltipla do histórico (pasta temporária, definições só em memória).
     /// `--window-test <pasta>`: captura a primeira janela visível e verifica que os cantos ficam brancos.
     static func windowTest(outDir: URL) -> Bool {
         try? FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
@@ -116,11 +106,13 @@ enum DemoShots {
         return ok
     }
 
-    static func historyTest(outDir: URL) -> Bool {
+    /// `--recents-test <pasta>`: testa a seleção múltipla na grelha de recentes do painel
+    /// (pasta temporária, definições só em memória).
+    static func recentsTest(outDir: URL) -> Bool {
         NSApplication.shared.setActivationPolicy(.accessory)
         let fm = FileManager.default
         try? fm.createDirectory(at: outDir, withIntermediateDirectories: true)
-        let dir = fm.temporaryDirectory.appendingPathComponent("SnapStudioHist-\(getpid())")
+        let dir = fm.temporaryDirectory.appendingPathComponent("SnapStudioRecents-\(getpid())")
         try? fm.removeItem(at: dir); try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: dir) }
         AppController.shared.settings.outputFolder = dir.path
@@ -131,11 +123,12 @@ enum DemoShots {
             let d = Date().addingTimeInterval(TimeInterval(-600 * i))
             try? fm.setAttributes([.creationDate: d, .modificationDate: d], ofItemAtPath: u.path)
         }
-        let m = HistoryModel()
+        let m = TrayModel()
         var ok = true
         func check(_ c: Bool, _ msg: String) { if !c { print("FALHA: \(msg)"); ok = false } }
-        let f = m.filtered
+        let f = m.recents
         check(f.count == 6, "6 capturas (\(f.count))")
+        guard f.count == 6 else { return false }
         m.click(f[0], modifiers: []); check(m.selection == [f[0].url], "clique simples")
         m.click(f[2], modifiers: .command); check(m.selection.count == 2, "⌘-clique junta")
         m.click(f[2], modifiers: .command); check(m.selection == [f[0].url], "⌘-clique retira")
@@ -143,30 +136,30 @@ enum DemoShots {
         check(m.selection == Set(f[1...4].map { $0.url }), "⇧-clique intervalo (\(m.selection.count))")
         check(m.targets(for: f[2]).count == 4 && m.targets(for: f[5]).count == 1, "ação aplica-se à seleção")
         m.selectAll(); check(m.selection.count == 6, "⌘A")
-        // janela com 3 selecionadas, para ver o aspeto
+        // painel com 3 selecionadas, para ver o aspeto
         m.clearSelection(); m.click(f[0], modifiers: []); m.click(f[2], modifiers: .command); m.click(f[3], modifiers: .command)
         func pump(_ s: Double) { RunLoop.main.run(until: Date().addingTimeInterval(s)) }
-        let wc = HostWindowController(title: "History", size: CGSize(width: 1000, height: 640), root: AnyView(HistoryView(model: m)), resizable: true, autosave: nil)
-        wc.window?.center(); wc.window?.orderFrontRegardless(); pump(2)
-        shoot(wc.window!, outDir.appendingPathComponent("history-multi.png"))
-        // seleção com o rato: retângulo que apanha as duas primeiras
-        check(m.cardFrames.count >= 2, "posições dos cartões (\(m.cardFrames.count))")
-        if let a = m.cardFrames[f[0].url], let b = m.cardFrames[f[1].url] {
-            m.clearSelection()
-            let u = a.union(b)
-            m.marqueeChanged(from: CGPoint(x: u.minX + 20, y: u.minY + 20), to: CGPoint(x: u.maxX - 20, y: u.maxY - 20))
-            pump(0.3)
-            shoot(wc.window!, outDir.appendingPathComponent("history-marquee.png"))
-            m.marqueeEnded()
-            check(m.selection == [f[0].url, f[1].url], "retângulo seleciona 2 (\(m.selection.count))")
-            check(m.marquee == nil, "retângulo desaparece")
-        }
-        wc.window?.orderOut(nil)
+        let w = NSWindow(contentRect: CGRect(origin: .zero, size: TrayPanelController.defaultSize), styleMask: [.titled], backing: .buffered, defer: false)
+        w.isReleasedWhenClosed = false
+        w.contentView = NSHostingView(rootView: TrayPanelView(model: m))
+        w.center(); w.orderFrontRegardless(); pump(2)
+        shoot(w, outDir.appendingPathComponent("recents-multi.png"))
+        // seleção com o rato: retângulo (posições calculadas) que apanha as duas primeiras
+        let lay = GridLayout.make(width: TrayPanelController.defaultSize.width, height: 300, pad: 14, gap: 8, top: 2)
+        let a = lay.frame(0), b = lay.frame(1)
+        m.clearSelection()
+        m.marqueeDragged(from: CGPoint(x: a.midX, y: a.midY), to: CGPoint(x: b.midX, y: b.midY), layout: lay, viewportHeight: 300)
+        pump(0.3)
+        shoot(w, outDir.appendingPathComponent("recents-marquee.png"))
+        m.marqueeEnded()
+        check(m.selection == [f[0].url, f[1].url], "retângulo seleciona 2 (\(m.selection.count))")
+        check(m.marquee == nil, "retângulo desaparece")
+        w.orderOut(nil)
         // apagar uma (sem diálogo)
         m.clearSelection(); m.click(f[5], modifiers: [])
-        m.trash(m.selectedItems)
-        check(m.items.count == 5 && m.selection.isEmpty, "apagar uma (\(m.items.count))")
-        print(ok ? "OK — seleção múltipla do histórico" : "FALHAS")
+        m.trash(m.selectedItems, confirm: false)
+        check(m.recents.count == 5 && m.selection.isEmpty, "apagar uma (\(m.recents.count))")
+        print(ok ? "OK — seleção múltipla nos recentes do painel" : "FALHAS")
         return ok
     }
 

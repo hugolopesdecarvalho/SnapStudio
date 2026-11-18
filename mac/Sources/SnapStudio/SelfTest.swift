@@ -180,7 +180,6 @@ enum SelfTest {
         snap(NSHostingView(rootView: TrayPanelView(model: TrayModel())), TrayPanelController.defaultSize, "panel")
         snap(NSHostingView(rootView: TrayPanelView(model: TrayModel())), TrayPanelController.minSize, "panel-min")
         snap(NSHostingView(rootView: SettingsView()), CGSize(width: 560, height: 430), "settings")
-        snap(NSHostingView(rootView: HistoryView().tint(Theme.accentColor)), CGSize(width: 980, height: 640), "history")
 
         let img = caps.appendingPathComponent("render.png")
         for compact in [false, true] {

@@ -2,7 +2,7 @@ import AppKit
 import QuickLookThumbnailing
 import SwiftUI
 
-/// Item do histórico (imagem ou vídeo na pasta das capturas).
+/// Captura na pasta (imagem ou vídeo), mostrada na grelha de recentes do painel.
 struct CaptureItem: Identifiable, Hashable {
     let url: URL
     let date: Date

@@ -30,7 +30,7 @@
         <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/panel-dark.png">
         <img src="assets/screenshots/panel-light.png" alt="Tray / menu bar panel with capture buttons and recent captures">
       </picture>
-      <p align="center"><b>Panel</b><br>One click from the tray / menu bar.</p>
+      <p align="center"><b>Panel</b><br>One click from the tray / menu bar, with all your captures.</p>
     </td>
     <td width="62%" valign="top">
       <picture>
@@ -38,11 +38,6 @@
         <img src="assets/screenshots/quick-editor-light.png" alt="Quick editor pop-up with a pixelated password field and an arrow">
       </picture>
       <p align="center"><b>Quick editor</b><br>Annotate, close & copy in seconds.</p>
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/history-dark.png">
-        <img src="assets/screenshots/history-light.png" alt="Capture history grouped by day, with search and filters">
-      </picture>
-      <p align="center"><b>History</b><br>Search, filter and drag captures into other apps.</p>
     </td>
   </tr>
 </table>
@@ -54,7 +49,7 @@
 - **Clipboard first**: every capture is saved and copied to the clipboard, ready to paste anywhere.
 - **Quick editor** pop-up and a **full editor**: arrows, boxes, text, blur and pixelate to hide sensitive data, highlighter, numbered steps, ellipses, lines, freehand and crop. Annotations stay editable when you reopen a capture.
 - **Screen recording** to MP4 (H.264) at 15/30/60 fps, with pause, stop and cancel. The recording frame and toolbar never appear in the video. Audio is not recorded yet.
-- **History** of captures and videos with thumbnails, search, filters and drag-and-drop to other apps. Select several captures by dragging a rectangle from empty space (or Ctrl/⌘-click, Shift-click) to copy or delete them together.
+- **All your captures in the panel**: the *Recent* grid scrolls through every capture and video in the folder. Click to select (Ctrl/⌘-click, Shift-click, or drag a rectangle from empty space for several), double-click to open in the editor, press Delete or the trash button to move them to the Trash, right-click to copy, show in the folder or rename, and drag captures into other apps (on Windows, drag from a capture that is already selected; dragging from an unselected one draws the selection rectangle).
 - **Light and dark themes**, accent colors, configurable shortcuts, PNG or JPG.
 - Interface in **English and Portuguese**, following the system language.
 - **Update notifications**: SnapStudio checks this repository's releases once a day and tells you when a new version is out (Settings › About shows your version; the check can be turned off). Only a request to GitHub's public API is made, no personal data is sent.
@@ -75,7 +70,7 @@ Get the files from the [latest release](https://github.com/hugolopesdecarvalho/S
 More details in [`mac/README.md`](mac/README.md).
 
 ## Using SnapStudio
-Click the tray / menu bar icon to open the **panel**: capture, record, see recent captures, switch theme and open the history. Right-click the icon for the full menu.
+Click the tray / menu bar icon to open the **panel**: capture, record, browse and manage all your captures, switch theme. Right-click the icon for the full menu.
 
 ### Shortcuts
 Macs have no PrtScn key, so the macOS version uses ⌃⇧ shortcuts that don't clash with the system's ⌘⇧3/4/5. All shortcuts can be changed in Settings.
@@ -93,7 +88,7 @@ In capture mode: click a window, drag a region, **Enter** = full screen, **A** =
 
 ### After a capture
 The image is saved to `Pictures/SnapStudio` and copied to the clipboard. Depending on *Settings › After capture*, it then opens in:
-- **Quick editor**: a pop-up next to the tray / menu bar with the most-used tools and *Close & Copy*. Esc or clicking outside saves and closes. It is only used right after a capture; opening a capture from the panel, the history or a notification always uses the full editor.
+- **Quick editor**: a pop-up next to the tray / menu bar with the most-used tools and *Close & Copy*. Esc or clicking outside saves and closes. It is only used right after a capture; opening a capture from the panel or a notification always uses the full editor.
 - **Full editor**: all tools, properties (color, width, text size) and the annotation list.
 - **Nothing**: just save and copy, with a notification.
 
